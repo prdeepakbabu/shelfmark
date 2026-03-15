@@ -116,6 +116,93 @@ export function parseMaybeNumber(value) {
   return match ? Number(match[1]) : null;
 }
 
+export function parseCompactCount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.round(value));
+  }
+
+  const cleaned = String(value || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/,/g, "")
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  const match = cleaned.match(/(\d+(?:\.\d+)?)\s*([kmb])?/i);
+  if (!match) {
+    return null;
+  }
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  const multiplier = { k: 1e3, m: 1e6, b: 1e9 }[String(match[2] || "").toLowerCase()] || 1;
+  return Math.round(amount * multiplier);
+}
+
+function extractMetricCountFromText(text = "", labelPatterns = []) {
+  const normalized = String(text || "").replace(/\u00a0/g, " ").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  for (const labelPattern of labelPatterns) {
+    const forward = normalized.match(new RegExp(`(\\d+(?:[,.]\\d+)?\\s*[kmb]?)\\s*${labelPattern}`, "i"));
+    if (forward?.[1]) {
+      return parseCompactCount(forward[1]);
+    }
+
+    const reverse = normalized.match(new RegExp(`${labelPattern}[^\\d]{0,24}(\\d+(?:[,.]\\d+)?\\s*[kmb]?)`, "i"));
+    if (reverse?.[1]) {
+      return parseCompactCount(reverse[1]);
+    }
+  }
+
+  return null;
+}
+
+function calculatePopularityCount({ likesCount = null, sharesCount = null, thumbsUpCount = null } = {}) {
+  const primaryReactionCount = Math.max(likesCount || 0, thumbsUpCount || 0);
+  const shareCount = sharesCount || 0;
+  const total = primaryReactionCount + shareCount;
+  return total > 0 ? total : null;
+}
+
+export function normalizePopularityMetrics(metadata = {}, existing = null) {
+  const likesCount = parseCompactCount(
+    metadata.likesCount ?? metadata.likeCount ?? metadata.likes ?? existing?.likesCount
+  );
+  const sharesCount = parseCompactCount(
+    metadata.sharesCount ?? metadata.shareCount ?? metadata.shares ?? existing?.sharesCount
+  );
+  const thumbsUpCount = parseCompactCount(
+    metadata.thumbsUpCount ?? metadata.thumbsupCount ?? metadata.thumbsUp ?? existing?.thumbsUpCount
+  );
+
+  return {
+    likesCount,
+    sharesCount,
+    thumbsUpCount,
+    popularityCount: calculatePopularityCount({ likesCount, sharesCount, thumbsUpCount })
+  };
+}
+
+export function formatCompactNumber(value) {
+  const parsed = parseCompactCount(value);
+  if (parsed === null) {
+    return "";
+  }
+
+  return new Intl.NumberFormat(undefined, {
+    notation: parsed >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: parsed >= 1000 ? 1 : 0
+  }).format(parsed);
+}
+
 export function extractHostname(inputUrl) {
   try {
     return new URL(inputUrl).hostname.replace(/^www\./, "");
@@ -277,6 +364,7 @@ export function inferTagsAndMetrics(metadata) {
 
 export function buildBookmarkRecord({ url, notes = "", metadata = {}, existing }) {
   const enriched = inferTagsAndMetrics({ ...metadata, url });
+  const popularity = normalizePopularityMetrics(metadata, existing);
   const now = new Date().toISOString();
   const normalizedUrl = enriched.normalizedUrl || normalizeUrl(url);
   const fullTitle = String(
@@ -318,6 +406,10 @@ export function buildBookmarkRecord({ url, notes = "", metadata = {}, existing }
     runtimeMinutes: enriched.runtimeMinutes ?? null,
     pageCount: enriched.pageCount ?? null,
     wordCount: parseMaybeNumber(metadata.wordCount) ?? existing?.wordCount ?? null,
+    likesCount: popularity.likesCount,
+    sharesCount: popularity.sharesCount,
+    thumbsUpCount: popularity.thumbsUpCount,
+    popularityCount: popularity.popularityCount,
     contentRef: metadata.contentRef || existing?.contentRef || null,
     thumbnailUrl: metadata.thumbnailUrl || existing?.thumbnailUrl || (enriched.tags.includes("youtube") ? buildYouTubeThumbnailUrl(url) : ""),
     siteName: metadata.siteName || existing?.siteName || slugFromHostname(enriched.hostname),
@@ -389,7 +481,30 @@ export function sortBookmarks(bookmarks, sortKey) {
   const items = [...bookmarks];
 
   const compareText = (left, right) => left.localeCompare(right, undefined, { sensitivity: "base" });
-  const compareNumber = (left, right) => (left ?? Number.POSITIVE_INFINITY) - (right ?? Number.POSITIVE_INFINITY);
+  const compareNumberAsc = (left, right) => {
+    if (left == null && right == null) {
+      return 0;
+    }
+    if (left == null) {
+      return 1;
+    }
+    if (right == null) {
+      return -1;
+    }
+    return left - right;
+  };
+  const compareNumberDesc = (left, right) => {
+    if (left == null && right == null) {
+      return 0;
+    }
+    if (left == null) {
+      return 1;
+    }
+    if (right == null) {
+      return -1;
+    }
+    return right - left;
+  };
 
   items.sort((left, right) => {
     switch (sortKey) {
@@ -398,13 +513,21 @@ export function sortBookmarks(bookmarks, sortKey) {
       case "title":
         return compareText(left.title, right.title);
       case "runtime-asc":
-        return compareNumber(left.runtimeMinutes, right.runtimeMinutes);
+        return compareNumberAsc(left.runtimeMinutes, right.runtimeMinutes);
       case "runtime-desc":
-        return compareNumber(right.runtimeMinutes, left.runtimeMinutes);
+        return compareNumberDesc(left.runtimeMinutes, right.runtimeMinutes);
       case "pages-asc":
-        return compareNumber(left.pageCount, right.pageCount);
+        return compareNumberAsc(left.pageCount, right.pageCount);
       case "pages-desc":
-        return compareNumber(right.pageCount, left.pageCount);
+        return compareNumberDesc(left.pageCount, right.pageCount);
+      case "popularity-desc":
+        return compareNumberDesc(left.popularityCount, right.popularityCount);
+      case "likes-desc":
+        return compareNumberDesc(left.likesCount, right.likesCount);
+      case "shares-desc":
+        return compareNumberDesc(left.sharesCount, right.sharesCount);
+      case "thumbs-up-desc":
+        return compareNumberDesc(left.thumbsUpCount, right.thumbsUpCount);
       default:
         return new Date(right.createdAt) - new Date(left.createdAt);
     }
@@ -591,6 +714,69 @@ function findThumbnailUrl(html) {
   ]);
 }
 
+function collectMatches(text, patterns) {
+  const matches = [];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text))) {
+      if (match[1]) {
+        matches.push(match[1]);
+      }
+    }
+  }
+
+  return matches;
+}
+
+export function extractPopularityMetricsFromHtml(html = "", url = "") {
+  const lowerUrl = String(url || "").toLowerCase();
+  const isYouTube = /(^https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\b/.test(lowerUrl);
+  const isX = /(^https?:\/\/)?(www\.)?(x\.com|twitter\.com)\b/.test(lowerUrl);
+  const candidates = collectMatches(html, [
+    /aria-label=["']([^"']*(?:likes?|reposts?|shares?|thumbs?\s*ups?|other people)[^"']*)["']/gi,
+    /title=["']([^"']*(?:likes?|reposts?|shares?|thumbs?\s*ups?|other people)[^"']*)["']/gi,
+    /"label":"([^"]*(?:likes?|reposts?|shares?|thumbs?\s*ups?|other people)[^"]*)"/gi,
+    /"accessibilityText":"([^"]*(?:likes?|reposts?|shares?|thumbs?\s*ups?|other people)[^"]*)"/gi,
+    />\s*([^<]*(?:likes?|reposts?|shares?|thumbs?\s*ups?)[^<]*)\s*</gi
+  ]);
+
+  const likesCount = isX
+    ? candidates
+        .map((candidate) => extractMetricCountFromText(candidate, ["likes?"]))
+        .find((value) => value !== null) ?? null
+    : null;
+  const sharesCount = isX
+    ? candidates
+        .map((candidate) => extractMetricCountFromText(candidate, ["reposts?", "shares?"]))
+        .find((value) => value !== null) ?? null
+    : null;
+  const thumbsUpCount = isYouTube
+    ? candidates
+        .map((candidate) =>
+          extractMetricCountFromText(candidate, [
+            "likes?",
+            "thumbs?\\s*ups?",
+            "other people"
+          ])
+        )
+        .find((value) => value !== null) ?? null
+    : null;
+
+  const interactionLikeCount =
+    isYouTube
+      ? parseCompactCount(
+          html.match(/"interactionType"\s*:\s*\{\s*"@type"\s*:\s*"http:\/\/schema\.org\/LikeAction"\s*\}\s*,\s*"userInteractionCount"\s*:\s*"([^"]+)"/i)?.[1]
+        )
+      : null;
+
+  return normalizePopularityMetrics({
+    likesCount,
+    sharesCount,
+    thumbsUpCount: thumbsUpCount ?? interactionLikeCount
+  });
+}
+
 export function extractHtmlMetadataFromText(html, url, mimeType = "text/html") {
   const cleanHtml = html || "";
   const text = stripHtml(cleanHtml);
@@ -631,6 +817,8 @@ export function extractHtmlMetadataFromText(html, url, mimeType = "text/html") {
     }
   }
 
+  const popularity = extractPopularityMetricsFromHtml(cleanHtml, url);
+
   return {
     url,
     title,
@@ -640,6 +828,10 @@ export function extractHtmlMetadataFromText(html, url, mimeType = "text/html") {
     wordCount,
     pageCount,
     runtimeMinutes,
+    likesCount: popularity.likesCount,
+    sharesCount: popularity.sharesCount,
+    thumbsUpCount: popularity.thumbsUpCount,
+    popularityCount: popularity.popularityCount,
     thumbnailUrl,
     mimeType,
     isPdf: mimeType === "application/pdf"
