@@ -111,6 +111,9 @@ function extractCurrentPageMetadata() {
     summary: getSummary(),
     siteName: getMetaContent('meta[property="og:site_name"]') || location.hostname.replace(/^www\./, ""),
     ogType: getMetaContent('meta[property="og:type"]'),
+    thumbnailUrl:
+      getMetaContent('meta[property="og:image"]') ||
+      getMetaContent('meta[name="twitter:image"]'),
     runtimeMinutes: getRuntimeMinutes(),
     wordCount: getWordCount(),
     capturedContent: extractReadablePageContent(),

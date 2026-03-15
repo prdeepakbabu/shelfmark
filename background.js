@@ -1,10 +1,12 @@
 import {
   PROJECTS_KEY,
   STORAGE_KEY,
+  buildYouTubeThumbnailUrl,
   buildBookmarkRecord,
   classifyUrl,
   createProjectRecord,
   escapeHtml,
+  extractYouTubeVideoId,
   estimatePdfPageCount,
   extractPdfText,
   extractReadableContentFromHtml,
@@ -14,6 +16,8 @@ import {
   slugifyFilePart,
   shorten
 } from "./shared.js";
+
+const BACKUP_SCHEMA_VERSION = 1;
 
 async function getBookmarks() {
   const stored = await chrome.storage.local.get(STORAGE_KEY);
@@ -57,6 +61,59 @@ async function upsertBookmark({ url, notes, metadata }) {
   };
 }
 
+async function fetchYouTubeMetadata(url, existing) {
+  const videoId = extractYouTubeVideoId(url);
+  const fallbackThumbnail = buildYouTubeThumbnailUrl(url);
+  const result = {
+    url,
+    title: existing?.title || "YouTube video",
+    summary: existing?.summary || "YouTube video saved for later review.",
+    thumbnailUrl: existing?.thumbnailUrl || fallbackThumbnail,
+    contentType: "video",
+    tags: ["youtube", "video"]
+  };
+
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const response = await fetch(oembedUrl, { redirect: "follow" });
+    if (response.ok) {
+      const data = await response.json();
+      result.title = data.title || result.title;
+      result.thumbnailUrl = data.thumbnail_url || result.thumbnailUrl;
+      result.siteName = data.author_name || result.siteName || "YouTube";
+    }
+  } catch {
+    // Ignore oEmbed failures and continue with generic extraction.
+  }
+
+  try {
+    const response = await fetch(url, { redirect: "follow" });
+    const mimeType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() || "";
+    const html = await response.text();
+    const pageMetadata = extractHtmlMetadataFromText(html, response.url || url, mimeType || "text/html");
+    return {
+      ...pageMetadata,
+      ...result,
+      title: pageMetadata.title && pageMetadata.title.toLowerCase() !== "youtube" ? pageMetadata.title : result.title,
+      summary:
+        pageMetadata.summary &&
+        !/^enjoy the videos and music you love/i.test(pageMetadata.summary)
+          ? pageMetadata.summary
+          : result.summary,
+      thumbnailUrl: pageMetadata.thumbnailUrl || result.thumbnailUrl || fallbackThumbnail,
+      contentType: "video",
+      isYouTube: true,
+      videoId
+    };
+  } catch {
+    return {
+      ...result,
+      isYouTube: true,
+      videoId
+    };
+  }
+}
+
 async function fetchUrlMetadata(url, existing) {
   const classification = classifyUrl(url);
   if (!/^https?:/i.test(url)) {
@@ -67,6 +124,10 @@ async function fetchUrlMetadata(url, existing) {
       contentType: classification.contentType,
       tags: classification.tags
     };
+  }
+
+  if (classification.tags.includes("youtube")) {
+    return fetchYouTubeMetadata(url, existing);
   }
 
   try {
@@ -111,6 +172,8 @@ async function scrapeBookmarkContent(bookmark) {
     summary: bookmark.summary,
     notes: bookmark.notes || "",
     contentType: bookmark.contentType,
+    runtimeMinutes: bookmark.runtimeMinutes ?? null,
+    thumbnailUrl: bookmark.thumbnailUrl || "",
     status: "ok",
     content: ""
   };
@@ -122,6 +185,14 @@ async function scrapeBookmarkContent(bookmark) {
       ...base,
       status: "cached",
       content: cachedContent
+    };
+  }
+
+  if (classification.tags.includes("youtube")) {
+    return {
+      ...base,
+      status: "metadata",
+      content: cachedContent || ""
     };
   }
 
@@ -176,6 +247,127 @@ async function scrapeBookmarkContent(bookmark) {
   }
 }
 
+function toMaybeNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeImportedBookmark(bookmark = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: bookmark.id || crypto.randomUUID(),
+    url: bookmark.url || "",
+    normalizedUrl: normalizeUrl(bookmark.normalizedUrl || bookmark.url || ""),
+    title: shorten(bookmark.title || "Untitled bookmark", 120),
+    summary: shorten(bookmark.summary || bookmark.description || "Saved bookmark.", 260),
+    notes: String(bookmark.notes || "").trim(),
+    tags: Array.isArray(bookmark.tags) ? [...new Set(bookmark.tags.filter(Boolean).map((tag) => String(tag).toLowerCase()))].sort() : [],
+    contentType: bookmark.contentType || classifyUrl(bookmark.url || "").contentType,
+    runtimeMinutes: toMaybeNumber(bookmark.runtimeMinutes),
+    pageCount: toMaybeNumber(bookmark.pageCount),
+    wordCount: toMaybeNumber(bookmark.wordCount),
+    capturedContent: String(bookmark.capturedContent || "").trim(),
+    thumbnailUrl: String(bookmark.thumbnailUrl || "").trim(),
+    siteName: String(bookmark.siteName || "").trim(),
+    hostname: String(bookmark.hostname || classifyUrl(bookmark.url || "").hostname || "").trim(),
+    createdAt: bookmark.createdAt || now,
+    updatedAt: bookmark.updatedAt || now
+  };
+}
+
+function normalizeImportedProject(project = {}, bookmarkIdMap = new Map()) {
+  const importedBookmarkIds = Array.isArray(project.bookmarkIds) ? project.bookmarkIds : [];
+  const mappedBookmarkIds = importedBookmarkIds
+    .map((id) => bookmarkIdMap.get(id) || id)
+    .filter(Boolean);
+
+  return createProjectRecord({
+    id: project.id,
+    name: project.name || "Untitled project",
+    description: project.description || "",
+    learnings: project.learnings || "",
+    bookmarkIds: mappedBookmarkIds,
+    images: Array.isArray(project.images) ? project.images.filter(Boolean) : [],
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt
+  });
+}
+
+async function exportDataSnapshot() {
+  const [bookmarks, projects] = await Promise.all([getBookmarks(), getProjects()]);
+  return {
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    bookmarks,
+    projects
+  };
+}
+
+async function importDataSnapshot(snapshot) {
+  const importedBookmarks = Array.isArray(snapshot?.bookmarks) ? snapshot.bookmarks : null;
+  const importedProjects = Array.isArray(snapshot?.projects) ? snapshot.projects : null;
+
+  if (!importedBookmarks || !importedProjects) {
+    throw new Error("Backup file is invalid. Expected bookmarks and projects arrays.");
+  }
+
+  const [existingBookmarks, existingProjects] = await Promise.all([getBookmarks(), getProjects()]);
+  const bookmarksByNormalizedUrl = new Map(existingBookmarks.map((bookmark) => [bookmark.normalizedUrl || normalizeUrl(bookmark.url), bookmark]));
+  const bookmarkIdMap = new Map();
+
+  for (const rawBookmark of importedBookmarks) {
+    const normalized = normalizeImportedBookmark(rawBookmark);
+    const existing = bookmarksByNormalizedUrl.get(normalized.normalizedUrl);
+    if (existing) {
+      const merged = {
+        ...existing,
+        ...normalized,
+        id: existing.id,
+        createdAt: existing.createdAt || normalized.createdAt,
+        updatedAt: new Date().toISOString()
+      };
+      bookmarksByNormalizedUrl.set(merged.normalizedUrl, merged);
+      bookmarkIdMap.set(rawBookmark.id, existing.id);
+    } else {
+      bookmarksByNormalizedUrl.set(normalized.normalizedUrl, normalized);
+      bookmarkIdMap.set(rawBookmark.id, normalized.id);
+    }
+  }
+
+  const mergedBookmarks = [...bookmarksByNormalizedUrl.values()].sort(
+    (left, right) => new Date(right.createdAt) - new Date(left.createdAt)
+  );
+
+  const projectsById = new Map(existingProjects.map((project) => [project.id, project]));
+  for (const rawProject of importedProjects) {
+    const normalized = normalizeImportedProject(rawProject, bookmarkIdMap);
+    if (projectsById.has(normalized.id)) {
+      const existing = projectsById.get(normalized.id);
+      projectsById.set(normalized.id, createProjectRecord({
+        ...existing,
+        ...normalized,
+        bookmarkIds: [...new Set([...(existing.bookmarkIds || []), ...(normalized.bookmarkIds || [])])],
+        images: [...(normalized.images || []), ...(existing.images || [])],
+        createdAt: existing.createdAt || normalized.createdAt,
+        updatedAt: new Date().toISOString()
+      }));
+    } else {
+      projectsById.set(normalized.id, normalized);
+    }
+  }
+
+  const mergedProjects = [...projectsById.values()].sort(
+    (left, right) => new Date(right.createdAt) - new Date(left.createdAt)
+  );
+
+  await Promise.all([setBookmarks(mergedBookmarks), setProjects(mergedProjects)]);
+
+  return {
+    bookmarkCount: mergedBookmarks.length,
+    projectCount: mergedProjects.length
+  };
+}
+
 function buildProjectExportHtml(project, bookmarks, sources) {
   const exportedAt = new Date().toLocaleString();
   const exportSlug = slugifyFilePart(project.name);
@@ -183,22 +375,42 @@ function buildProjectExportHtml(project, bookmarks, sources) {
     .map((source, index) => {
       const bookmark = bookmarks.find((item) => item.id === source.id);
       const bookmarkNote = bookmark?.notes ? `<p><strong>Saved note:</strong> ${escapeHtml(bookmark.notes)}</p>` : "";
+      const mediaCard = source.thumbnailUrl
+        ? `
+          <div class="media-card">
+            <img class="media-thumb" src="${escapeHtml(source.thumbnailUrl)}" alt="${escapeHtml(source.title || "Source thumbnail")}">
+            <div class="media-copy">
+              <p class="source-meta"><strong>Reference URL:</strong> <a href="${escapeHtml(source.referenceUrl)}">${escapeHtml(source.referenceUrl)}</a></p>
+              <p class="source-meta"><strong>Type:</strong> ${escapeHtml(source.contentType || "page")} · <strong>Export status:</strong> ${escapeHtml(source.status)}${source.runtimeMinutes ? ` · <strong>Runtime:</strong> ${escapeHtml(source.runtimeMinutes)} min` : ""}</p>
+              <p><strong>${source.contentType === "video" ? "Description" : "Summary"}:</strong> ${escapeHtml(source.summary || "No summary available.")}</p>
+              ${bookmarkNote}
+            </div>
+          </div>
+        `
+        : `
+          <p class="source-meta"><strong>Reference URL:</strong> <a href="${escapeHtml(source.referenceUrl)}">${escapeHtml(source.referenceUrl)}</a></p>
+          <p class="source-meta"><strong>Type:</strong> ${escapeHtml(source.contentType || "page")} · <strong>Export status:</strong> ${escapeHtml(source.status)}${source.runtimeMinutes ? ` · <strong>Runtime:</strong> ${escapeHtml(source.runtimeMinutes)} min` : ""}</p>
+          <p><strong>${source.contentType === "video" ? "Description" : "Summary"}:</strong> ${escapeHtml(source.summary || "No summary available.")}</p>
+          ${bookmarkNote}
+        `;
       const contentBlocks = escapeHtml(source.content || "")
         .split(/\n{2,}/)
         .filter(Boolean)
         .map((paragraph) => `<p>${paragraph}</p>`)
         .join("");
+      const contentSection = contentBlocks
+        ? contentBlocks
+        : source.contentType === "video"
+          ? ""
+          : "<p>No readable content was extracted for this source.</p>";
 
       return `
         <section class="source-card">
           <p class="source-index">Source ${index + 1}</p>
           <h2>${escapeHtml(source.title || "Untitled source")}</h2>
-          <p class="source-meta"><strong>Reference URL:</strong> <a href="${escapeHtml(source.referenceUrl)}">${escapeHtml(source.referenceUrl)}</a></p>
-          <p class="source-meta"><strong>Type:</strong> ${escapeHtml(source.contentType || "page")} · <strong>Export status:</strong> ${escapeHtml(source.status)}</p>
-          <p><strong>Summary:</strong> ${escapeHtml(source.summary || "No summary available.")}</p>
-          ${bookmarkNote}
+          ${mediaCard}
           <div class="source-content">
-            ${contentBlocks || "<p>No readable content was extracted for this source.</p>"}
+            ${contentSection}
           </div>
         </section>
       `;
@@ -224,6 +436,9 @@ function buildProjectExportHtml(project, bookmarks, sources) {
       .source-card + .source-card { margin-top: 18px; }
       .source-meta { font-family: Arial, sans-serif; font-size: 13px; color: #5a5d63; word-break: break-word; }
       .source-content p { margin: 0 0 14px; }
+      .media-card { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 14px; }
+      .media-thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; border: 1px solid rgba(31,36,48,.12); background: #ece7dd; }
+      .media-copy { min-width: 0; }
       a { color: #0f766e; }
       .annotation-panel { position: sticky; top: 18px; z-index: 20; max-width: 960px; margin: 0 auto 18px; padding: 16px 18px; border-radius: 18px; background: rgba(255,253,250,.96); border: 1px solid rgba(31,36,48,.12); box-shadow: 0 18px 30px rgba(75,54,28,.10); backdrop-filter: blur(8px); }
       .annotation-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -251,6 +466,9 @@ function buildProjectExportHtml(project, bookmarks, sources) {
         .source-card + .source-card { margin-top: 12px; }
         a { color: #1f2430; text-decoration: none; }
         .annotation[data-comment]::after { display: none; }
+      }
+      @media (max-width: 760px) {
+        .media-card { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -613,6 +831,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case "EXPORT_PROJECT": {
         const result = await exportProject(message.payload.projectId);
+        sendResponse({ ok: true, ...result });
+        break;
+      }
+      case "EXPORT_DATA": {
+        const snapshot = await exportDataSnapshot();
+        sendResponse({
+          ok: true,
+          fileName: `shelfmark-backup-${snapshot.exportedAt.slice(0, 10)}.json`,
+          data: JSON.stringify(snapshot, null, 2),
+          bookmarkCount: snapshot.bookmarks.length,
+          projectCount: snapshot.projects.length
+        });
+        break;
+      }
+      case "IMPORT_DATA": {
+        const result = await importDataSnapshot(message.payload);
         sendResponse({ ok: true, ...result });
         break;
       }

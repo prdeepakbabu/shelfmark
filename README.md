@@ -180,6 +180,10 @@ Project tests:
 npm test
 ```
 
+## Citation
+
+If you reference or reuse Shelfmark, citation metadata is available in [CITATION.cff](CITATION.cff).
+
 ## Repo Notes
 
 Documentation screenshots used in this README live in:

@@ -124,6 +124,37 @@ export function extractHostname(inputUrl) {
   }
 }
 
+export function extractYouTubeVideoId(inputUrl = "") {
+  try {
+    const url = new URL(inputUrl);
+    const hostname = url.hostname.replace(/^www\./, "");
+
+    if (hostname === "youtu.be") {
+      return url.pathname.replace(/^\/+/, "").split("/")[0] || "";
+    }
+
+    if (hostname.endsWith("youtube.com")) {
+      if (url.pathname === "/watch") {
+        return url.searchParams.get("v") || "";
+      }
+
+      const embedMatch = url.pathname.match(/^\/(?:embed|shorts|live)\/([^/?#]+)/);
+      if (embedMatch?.[1]) {
+        return embedMatch[1];
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+export function buildYouTubeThumbnailUrl(inputUrl = "") {
+  const videoId = extractYouTubeVideoId(inputUrl);
+  return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
+}
+
 export function classifyUrl(inputUrl) {
   const normalizedUrl = normalizeUrl(inputUrl);
   const hostname = extractHostname(normalizedUrl);
@@ -278,6 +309,7 @@ export function buildBookmarkRecord({ url, notes = "", metadata = {}, existing }
     pageCount: enriched.pageCount ?? null,
     wordCount: parseMaybeNumber(metadata.wordCount) ?? existing?.wordCount ?? null,
     capturedContent: normalizeCapturedContent(metadata.capturedContent || existing?.capturedContent || ""),
+    thumbnailUrl: metadata.thumbnailUrl || existing?.thumbnailUrl || (enriched.tags.includes("youtube") ? buildYouTubeThumbnailUrl(url) : ""),
     siteName: metadata.siteName || existing?.siteName || slugFromHostname(enriched.hostname),
     hostname: enriched.hostname,
     createdAt: existing?.createdAt || now,
@@ -541,6 +573,14 @@ function findDescription(html) {
   );
 }
 
+function findThumbnailUrl(html) {
+  return findMeta(html, [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<link[^>]+itemprop=["']thumbnailUrl["'][^>]+href=["']([^"']+)["']/i
+  ]);
+}
+
 export function extractHtmlMetadataFromText(html, url, mimeType = "text/html") {
   const cleanHtml = html || "";
   const text = stripHtml(cleanHtml);
@@ -553,6 +593,7 @@ export function extractHtmlMetadataFromText(html, url, mimeType = "text/html") {
   const ogType = findMeta(cleanHtml, [
     /<meta[^>]+property=["']og:type["'][^>]+content=["']([^"']+)["']/i
   ]);
+  const thumbnailUrl = findThumbnailUrl(cleanHtml) || buildYouTubeThumbnailUrl(url);
   const pageCount = parseMaybeNumber(
     findMeta(cleanHtml, [
       /<meta[^>]+name=["']citation_num_pages["'][^>]+content=["']([^"']+)["']/i
@@ -589,6 +630,7 @@ export function extractHtmlMetadataFromText(html, url, mimeType = "text/html") {
     wordCount,
     pageCount,
     runtimeMinutes,
+    thumbnailUrl,
     mimeType,
     isPdf: mimeType === "application/pdf"
   };

@@ -136,6 +136,43 @@ globalThis.fetch = async (url) => {
           headers: { "content-type": "text/html; charset=utf-8" }
         }
       );
+    case "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Ddemo123&format=json":
+      return new Response(
+        JSON.stringify({
+          title: "Agent Orchestration Deep Dive",
+          author_name: "Shelfmark Lab",
+          thumbnail_url: "https://i.ytimg.com/vi/demo123/hqdefault.jpg"
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" }
+        }
+      );
+    case "https://www.youtube.com/watch?v=demo123":
+      return new Response(
+        `<!doctype html>
+        <html>
+          <head>
+            <title>Agent Orchestration Deep Dive - YouTube</title>
+            <meta property="og:title" content="Agent Orchestration Deep Dive">
+            <meta name="description" content="A walkthrough of orchestrating agent teams, harnesses, and coordination loops.">
+            <meta property="og:description" content="A walkthrough of orchestrating agent teams, harnesses, and coordination loops.">
+            <meta property="og:image" content="https://i.ytimg.com/vi/demo123/maxresdefault.jpg">
+            <meta property="og:site_name" content="YouTube">
+            <meta property="og:type" content="video.other">
+            <meta itemprop="duration" content="PT42M12S">
+          </head>
+          <body>
+            <main>
+              <p>Ignore generic boilerplate and prefer the metadata description for export.</p>
+            </main>
+          </body>
+        </html>`,
+        {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" }
+        }
+      );
     default:
       throw new Error(`Unexpected fetch URL in test: ${url}`);
   }
@@ -318,6 +355,78 @@ await run("X export falls back to cached page text instead of blocked fallback h
   assert.equal(exportResponse.ok, true);
   assert.match(exportResponse.html, /Measure behavior, not just loss/);
   assert.doesNotMatch(exportResponse.html, /JavaScript is disabled in this browser/);
+});
+
+await run("YouTube bookmarks preserve title description runtime and thumbnail in export", async () => {
+  const bookmarkResponse = await sendMessage("SAVE_BOOKMARK", {
+    url: "https://www.youtube.com/watch?v=demo123",
+    notes: "Important video on agent orchestration.",
+    metadata: {}
+  });
+
+  assert.equal(bookmarkResponse.ok, true);
+  assert.equal(bookmarkResponse.bookmark.title, "Agent Orchestration Deep Dive");
+  assert.equal(bookmarkResponse.bookmark.contentType, "video");
+  assert.equal(bookmarkResponse.bookmark.runtimeMinutes, 43);
+  assert.match(bookmarkResponse.bookmark.thumbnailUrl, /demo123/);
+  assert.match(bookmarkResponse.bookmark.summary, /orchestrating agent teams/);
+
+  const projectResponse = await sendMessage("UPSERT_PROJECT", {
+    name: "Video export",
+    description: "Video metadata export case."
+  });
+
+  await sendMessage("ASSIGN_BOOKMARKS_TO_PROJECT", {
+    projectId: projectResponse.project.id,
+    bookmarkIds: [bookmarkResponse.bookmark.id]
+  });
+
+  const exportResponse = await sendMessage("EXPORT_PROJECT", {
+    projectId: projectResponse.project.id
+  });
+
+  assert.equal(exportResponse.ok, true);
+  assert.match(exportResponse.html, /Agent Orchestration Deep Dive/);
+  assert.match(exportResponse.html, /Description:/);
+  assert.match(exportResponse.html, /hqdefault|maxresdefault/);
+  assert.match(exportResponse.html, /Runtime:<\/strong> 43 min/);
+});
+
+await run("raw backup export and import merge data safely", async () => {
+  const exportResponse = await sendMessage("EXPORT_DATA");
+  assert.equal(exportResponse.ok, true);
+  const snapshot = JSON.parse(exportResponse.data);
+  assert.ok(Array.isArray(snapshot.bookmarks));
+  assert.ok(Array.isArray(snapshot.projects));
+
+  const importResponse = await sendMessage("IMPORT_DATA", {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    bookmarks: [
+      {
+        id: "import-bookmark-1",
+        url: "https://example.com/imported",
+        title: "Imported article",
+        summary: "Imported summary",
+        tags: ["article", "blog"],
+        contentType: "article"
+      }
+    ],
+    projects: [
+      {
+        id: "import-project-1",
+        name: "Imported project",
+        description: "Imported backup project",
+        bookmarkIds: ["import-bookmark-1"]
+      }
+    ]
+  });
+
+  assert.equal(importResponse.ok, true);
+
+  const stored = await chrome.storage.local.get([STORAGE_KEY, PROJECTS_KEY]);
+  assert.ok(stored[STORAGE_KEY].some((item) => item.title === "Imported article"));
+  assert.ok(stored[PROJECTS_KEY].some((item) => item.name === "Imported project"));
 });
 
 process.exit(process.exitCode || 0);

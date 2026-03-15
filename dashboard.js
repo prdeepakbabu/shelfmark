@@ -39,6 +39,9 @@ const addSelectedToProjectButton = document.getElementById("addSelectedToProject
 const projectAssignmentSelect = document.getElementById("projectAssignmentSelect");
 const showBookmarksViewButton = document.getElementById("showBookmarksView");
 const showProjectsViewButton = document.getElementById("showProjectsView");
+const exportDataButton = document.getElementById("exportDataButton");
+const importDataButton = document.getElementById("importDataButton");
+const importDataInput = document.getElementById("importDataInput");
 const bookmarkControlsCard = document.getElementById("bookmarkControlsCard");
 const projectEditorCard = document.getElementById("projectEditorCard");
 const bookmarkToolbarActions = document.getElementById("bookmarkToolbarActions");
@@ -557,6 +560,55 @@ function escapeHtml(value) {
 }
 
 function wireControls() {
+  exportDataButton.addEventListener("click", async () => {
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "EXPORT_DATA" });
+      if (!response?.ok) {
+        throw new Error(response?.error || "Backup export failed.");
+      }
+      downloadTextFile(response.fileName, response.data, "application/json");
+    } catch (error) {
+      window.alert(String(error));
+    }
+  });
+
+  importDataButton.addEventListener("click", () => {
+    importDataInput.click();
+  });
+
+  importDataInput.addEventListener("change", async () => {
+    const file = importDataInput.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const raw = await file.text();
+      const payload = JSON.parse(raw);
+      const confirmed = window.confirm("Import this backup into the current Shelfmark data? Existing data will be preserved and merged.");
+      if (!confirmed) {
+        importDataInput.value = "";
+        return;
+      }
+
+      const response = await chrome.runtime.sendMessage({
+        type: "IMPORT_DATA",
+        payload
+      });
+
+      if (!response?.ok) {
+        throw new Error(response?.error || "Backup import failed.");
+      }
+
+      await loadData();
+      window.alert(`Import complete. Shelfmark now has ${response.bookmarkCount} bookmarks and ${response.projectCount} projects.`);
+    } catch (error) {
+      window.alert(String(error));
+    } finally {
+      importDataInput.value = "";
+    }
+  });
+
   showBookmarksViewButton.addEventListener("click", () => {
     state.view = "bookmarks";
     render();
