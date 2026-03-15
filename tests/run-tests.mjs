@@ -161,6 +161,7 @@ globalThis.fetch = async (url) => {
             <meta property="og:site_name" content="YouTube">
             <meta property="og:type" content="video.other">
             <meta itemprop="duration" content="PT42M12S">
+            <script>var ytInitialPlayerResponse = {"videoDetails":{"shortDescription":"A walkthrough of orchestrating agent teams, harnesses, and coordination loops. This version includes the longer description text that should be preserved for export rather than being truncated in the UI card."}};</script>
           </head>
           <body>
             <main>
@@ -331,12 +332,12 @@ await run("X export falls back to cached page text instead of blocked fallback h
       title: "Distillation notes on X",
       summary: "A longform X article about model distillation.",
       contentType: "article",
-      capturedContent: "Distillation works best when the student target is specific.\n\nMeasure behavior, not just loss."
+      capturedContent: "Distillation works best when the student target is specific.\n\nMeasure behavior, not just loss.\n\nKeep the evaluation target aligned with the deployment task."
     }
   });
 
   assert.equal(bookmarkResponse.ok, true);
-  assert.match(bookmarkResponse.bookmark.capturedContent, /Measure behavior, not just loss/);
+  assert.ok(bookmarkResponse.bookmark.contentRef);
 
   const projectResponse = await sendMessage("UPSERT_PROJECT", {
     name: "X export cache",
@@ -354,6 +355,7 @@ await run("X export falls back to cached page text instead of blocked fallback h
 
   assert.equal(exportResponse.ok, true);
   assert.match(exportResponse.html, /Measure behavior, not just loss/);
+  assert.match(exportResponse.html, /Keep the evaluation target aligned with the deployment task/);
   assert.doesNotMatch(exportResponse.html, /JavaScript is disabled in this browser/);
 });
 
@@ -370,6 +372,7 @@ await run("YouTube bookmarks preserve title description runtime and thumbnail in
   assert.equal(bookmarkResponse.bookmark.runtimeMinutes, 43);
   assert.match(bookmarkResponse.bookmark.thumbnailUrl, /demo123/);
   assert.match(bookmarkResponse.bookmark.summary, /orchestrating agent teams/);
+  assert.ok(bookmarkResponse.bookmark.contentRef);
 
   const projectResponse = await sendMessage("UPSERT_PROJECT", {
     name: "Video export",
@@ -390,6 +393,7 @@ await run("YouTube bookmarks preserve title description runtime and thumbnail in
   assert.match(exportResponse.html, /Description:/);
   assert.match(exportResponse.html, /hqdefault|maxresdefault/);
   assert.match(exportResponse.html, /Runtime:<\/strong> 43 min/);
+  assert.match(exportResponse.html, /longer description text that should be preserved for export/);
 });
 
 await run("raw backup export and import merge data safely", async () => {

@@ -16,6 +16,12 @@ import {
   slugifyFilePart,
   shorten
 } from "./shared.js";
+import {
+  deleteContentRecords,
+  getContentRecord,
+  listContentRecords,
+  putContentRecord
+} from "./content-store.js";
 
 const BACKUP_SCHEMA_VERSION = 1;
 
@@ -37,15 +43,93 @@ async function setProjects(projects) {
   await chrome.storage.local.set({ [PROJECTS_KEY]: projects });
 }
 
+function buildContentRecord({ id, url, metadata = {}, existingRecord = null, bookmark = null }) {
+  const fullTitle = String(
+    metadata.fullTitle ||
+      metadata.title ||
+      metadata.pageTitle ||
+      existingRecord?.fullTitle ||
+      bookmark?.title ||
+      "Untitled source"
+  ).replace(/\s+/g, " ").trim();
+
+  const fullDescription = String(
+    metadata.fullDescription ||
+      metadata.summary ||
+      metadata.description ||
+      metadata.excerpt ||
+      existingRecord?.fullDescription ||
+      ""
+  ).replace(/\s+/g, " ").trim();
+
+  const capturedText = String(
+    metadata.capturedContent ||
+      existingRecord?.capturedText ||
+      ""
+  ).replace(/\r/g, "").trim();
+
+  if (!fullTitle && !fullDescription && !capturedText) {
+    return null;
+  }
+
+  return {
+    id: id || existingRecord?.id || crypto.randomUUID(),
+    url,
+    fullTitle: fullTitle || existingRecord?.fullTitle || bookmark?.title || "Untitled source",
+    fullDescription,
+    capturedText,
+    createdAt: existingRecord?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+let initializationPromise = null;
+
+async function ensureInitialized() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      const bookmarks = await getBookmarks();
+      if (!Array.isArray(bookmarks)) {
+        await setBookmarks([]);
+      }
+
+      const projects = await getProjects();
+      if (!Array.isArray(projects)) {
+        await setProjects([]);
+      }
+
+      await migrateInlineBookmarkContent();
+    })();
+  }
+
+  return initializationPromise;
+}
+
 async function upsertBookmark({ url, notes, metadata }) {
+  await ensureInitialized();
   const normalizedUrl = normalizeUrl(url);
   const bookmarks = await getBookmarks();
   const existing = bookmarks.find((bookmark) => bookmark.normalizedUrl === normalizedUrl);
+  const existingContent = existing?.contentRef ? await getContentRecord(existing.contentRef) : null;
   const remoteMetadata = await fetchUrlMetadata(url, existing);
+  const mergedMetadata = { ...remoteMetadata, ...metadata, url };
+  const contentRecord = buildContentRecord({
+    id: existing?.contentRef,
+    url,
+    metadata: mergedMetadata,
+    existingRecord: existingContent,
+    bookmark: existing
+  });
+  if (contentRecord) {
+    await putContentRecord(contentRecord);
+  }
   const bookmark = buildBookmarkRecord({
     url,
     notes,
-    metadata: { ...remoteMetadata, ...metadata, url },
+    metadata: {
+      ...mergedMetadata,
+      contentRef: contentRecord?.id || existing?.contentRef || null
+    },
     existing
   });
 
@@ -91,6 +175,15 @@ async function fetchYouTubeMetadata(url, existing) {
     const mimeType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() || "";
     const html = await response.text();
     const pageMetadata = extractHtmlMetadataFromText(html, response.url || url, mimeType || "text/html");
+    const shortDescriptionMatch = html.match(/"shortDescription":"((?:\\.|[^"])*)"/i);
+    let fullDescription = pageMetadata.summary || result.summary;
+    if (shortDescriptionMatch?.[1]) {
+      try {
+        fullDescription = JSON.parse(`"${shortDescriptionMatch[1]}"`);
+      } catch {
+        fullDescription = pageMetadata.summary || result.summary;
+      }
+    }
     return {
       ...pageMetadata,
       ...result,
@@ -100,6 +193,7 @@ async function fetchYouTubeMetadata(url, existing) {
         !/^enjoy the videos and music you love/i.test(pageMetadata.summary)
           ? pageMetadata.summary
           : result.summary,
+      fullDescription,
       thumbnailUrl: pageMetadata.thumbnailUrl || result.thumbnailUrl || fallbackThumbnail,
       contentType: "video",
       isYouTube: true,
@@ -115,6 +209,7 @@ async function fetchYouTubeMetadata(url, existing) {
 }
 
 async function fetchUrlMetadata(url, existing) {
+  await ensureInitialized();
   const classification = classifyUrl(url);
   if (!/^https?:/i.test(url)) {
     return {
@@ -164,12 +259,14 @@ async function fetchUrlMetadata(url, existing) {
 }
 
 async function scrapeBookmarkContent(bookmark) {
+  await ensureInitialized();
   const classification = classifyUrl(bookmark.url);
+  const contentRecord = bookmark.contentRef ? await getContentRecord(bookmark.contentRef) : null;
   const base = {
     id: bookmark.id,
-    title: bookmark.title,
+    title: contentRecord?.fullTitle || bookmark.title,
     referenceUrl: bookmark.url,
-    summary: bookmark.summary,
+    summary: contentRecord?.fullDescription || bookmark.summary,
     notes: bookmark.notes || "",
     contentType: bookmark.contentType,
     runtimeMinutes: bookmark.runtimeMinutes ?? null,
@@ -178,7 +275,7 @@ async function scrapeBookmarkContent(bookmark) {
     content: ""
   };
 
-  const cachedContent = String(bookmark.capturedContent || "").trim();
+  const cachedContent = String(contentRecord?.capturedText || "").trim();
 
   if (classification.tags.includes("x") && cachedContent) {
     return {
@@ -252,6 +349,54 @@ function toMaybeNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+async function migrateInlineBookmarkContent() {
+  const bookmarks = await getBookmarks();
+  let changed = false;
+  const nextBookmarks = [];
+
+  for (const bookmark of bookmarks) {
+    if (!bookmark) {
+      continue;
+    }
+
+    const existingContent = bookmark.contentRef ? await getContentRecord(bookmark.contentRef) : null;
+    const legacyContentRecord = buildContentRecord({
+      id: bookmark.contentRef,
+      url: bookmark.url,
+      metadata: {
+        fullTitle: bookmark.fullTitle || bookmark.title,
+        fullDescription: bookmark.fullDescription || bookmark.summary,
+        capturedContent: bookmark.capturedContent || ""
+      },
+      existingRecord: existingContent,
+      bookmark
+    });
+
+    const normalizedBookmark = { ...bookmark };
+    if (legacyContentRecord) {
+      await putContentRecord(legacyContentRecord);
+      normalizedBookmark.contentRef = legacyContentRecord.id;
+    }
+
+    if ("capturedContent" in normalizedBookmark || "fullTitle" in normalizedBookmark || "fullDescription" in normalizedBookmark) {
+      delete normalizedBookmark.capturedContent;
+      delete normalizedBookmark.fullTitle;
+      delete normalizedBookmark.fullDescription;
+      changed = true;
+    }
+
+    if (legacyContentRecord && normalizedBookmark.contentRef !== bookmark.contentRef) {
+      changed = true;
+    }
+
+    nextBookmarks.push(normalizedBookmark);
+  }
+
+  if (changed) {
+    await setBookmarks(nextBookmarks);
+  }
+}
+
 function normalizeImportedBookmark(bookmark = {}) {
   const now = new Date().toISOString();
   return {
@@ -266,7 +411,7 @@ function normalizeImportedBookmark(bookmark = {}) {
     runtimeMinutes: toMaybeNumber(bookmark.runtimeMinutes),
     pageCount: toMaybeNumber(bookmark.pageCount),
     wordCount: toMaybeNumber(bookmark.wordCount),
-    capturedContent: String(bookmark.capturedContent || "").trim(),
+    contentRef: bookmark.contentRef || null,
     thumbnailUrl: String(bookmark.thumbnailUrl || "").trim(),
     siteName: String(bookmark.siteName || "").trim(),
     hostname: String(bookmark.hostname || classifyUrl(bookmark.url || "").hostname || "").trim(),
@@ -294,18 +439,22 @@ function normalizeImportedProject(project = {}, bookmarkIdMap = new Map()) {
 }
 
 async function exportDataSnapshot() {
-  const [bookmarks, projects] = await Promise.all([getBookmarks(), getProjects()]);
+  await ensureInitialized();
+  const [bookmarks, projects, contentRecords] = await Promise.all([getBookmarks(), getProjects(), listContentRecords()]);
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     bookmarks,
-    projects
+    projects,
+    contentRecords
   };
 }
 
 async function importDataSnapshot(snapshot) {
+  await ensureInitialized();
   const importedBookmarks = Array.isArray(snapshot?.bookmarks) ? snapshot.bookmarks : null;
   const importedProjects = Array.isArray(snapshot?.projects) ? snapshot.projects : null;
+  const importedContentRecords = Array.isArray(snapshot?.contentRecords) ? snapshot.contentRecords : [];
 
   if (!importedBookmarks || !importedProjects) {
     throw new Error("Backup file is invalid. Expected bookmarks and projects arrays.");
@@ -314,29 +463,103 @@ async function importDataSnapshot(snapshot) {
   const [existingBookmarks, existingProjects] = await Promise.all([getBookmarks(), getProjects()]);
   const bookmarksByNormalizedUrl = new Map(existingBookmarks.map((bookmark) => [bookmark.normalizedUrl || normalizeUrl(bookmark.url), bookmark]));
   const bookmarkIdMap = new Map();
+  const contentIdMap = new Map();
 
   for (const rawBookmark of importedBookmarks) {
     const normalized = normalizeImportedBookmark(rawBookmark);
     const existing = bookmarksByNormalizedUrl.get(normalized.normalizedUrl);
     if (existing) {
+      const targetContentRef = existing.contentRef || normalized.contentRef || crypto.randomUUID();
       const merged = {
         ...existing,
         ...normalized,
         id: existing.id,
+        contentRef: targetContentRef,
         createdAt: existing.createdAt || normalized.createdAt,
         updatedAt: new Date().toISOString()
       };
       bookmarksByNormalizedUrl.set(merged.normalizedUrl, merged);
       bookmarkIdMap.set(rawBookmark.id, existing.id);
+      if (rawBookmark.contentRef) {
+        contentIdMap.set(rawBookmark.contentRef, targetContentRef);
+      }
     } else {
+      const targetContentRef = normalized.contentRef || (rawBookmark.fullDescription || rawBookmark.capturedContent ? crypto.randomUUID() : null);
+      normalized.contentRef = targetContentRef;
       bookmarksByNormalizedUrl.set(normalized.normalizedUrl, normalized);
       bookmarkIdMap.set(rawBookmark.id, normalized.id);
+      if (rawBookmark.contentRef) {
+        contentIdMap.set(rawBookmark.contentRef, targetContentRef);
+      }
     }
   }
 
   const mergedBookmarks = [...bookmarksByNormalizedUrl.values()].sort(
     (left, right) => new Date(right.createdAt) - new Date(left.createdAt)
   );
+
+  for (const rawBookmark of importedBookmarks) {
+    if ((rawBookmark.fullTitle || rawBookmark.fullDescription || rawBookmark.capturedContent) && !rawBookmark.contentRef) {
+      const mappedBookmarkId = bookmarkIdMap.get(rawBookmark.id);
+      const targetBookmark = mergedBookmarks.find((bookmark) => bookmark.id === mappedBookmarkId);
+      if (targetBookmark) {
+        const newContentId = targetBookmark.contentRef || crypto.randomUUID();
+        targetBookmark.contentRef = newContentId;
+        contentIdMap.set(`legacy:${rawBookmark.id}`, newContentId);
+      }
+    }
+  }
+
+  const existingContentRecords = await listContentRecords();
+  const contentById = new Map(existingContentRecords.map((record) => [record.id, record]));
+
+  for (const rawRecord of importedContentRecords) {
+    const targetId = contentIdMap.get(rawRecord.id) || rawRecord.id;
+    const existing = contentById.get(targetId);
+    const normalizedRecord = buildContentRecord({
+      id: targetId,
+      url: rawRecord.url || "",
+      metadata: {
+        fullTitle: rawRecord.fullTitle,
+        fullDescription: rawRecord.fullDescription,
+        capturedContent: rawRecord.capturedText
+      },
+      existingRecord: existing
+    });
+    if (normalizedRecord) {
+      contentById.set(targetId, normalizedRecord);
+    }
+  }
+
+  for (const rawBookmark of importedBookmarks) {
+    if (rawBookmark.fullTitle || rawBookmark.fullDescription || rawBookmark.capturedContent) {
+      const mappedBookmarkId = bookmarkIdMap.get(rawBookmark.id);
+      const targetBookmark = mergedBookmarks.find((bookmark) => bookmark.id === mappedBookmarkId);
+      if (!targetBookmark) {
+        continue;
+      }
+      const targetId =
+        targetBookmark.contentRef ||
+        contentIdMap.get(rawBookmark.contentRef) ||
+        contentIdMap.get(`legacy:${rawBookmark.id}`) ||
+        crypto.randomUUID();
+      targetBookmark.contentRef = targetId;
+      const normalizedRecord = buildContentRecord({
+        id: targetId,
+        url: rawBookmark.url || targetBookmark.url,
+        metadata: {
+          fullTitle: rawBookmark.fullTitle || rawBookmark.title,
+          fullDescription: rawBookmark.fullDescription || rawBookmark.summary || rawBookmark.description,
+          capturedContent: rawBookmark.capturedContent || ""
+        },
+        existingRecord: contentById.get(targetId),
+        bookmark: targetBookmark
+      });
+      if (normalizedRecord) {
+        contentById.set(targetId, normalizedRecord);
+      }
+    }
+  }
 
   const projectsById = new Map(existingProjects.map((project) => [project.id, project]));
   for (const rawProject of importedProjects) {
@@ -361,10 +584,12 @@ async function importDataSnapshot(snapshot) {
   );
 
   await Promise.all([setBookmarks(mergedBookmarks), setProjects(mergedProjects)]);
+  await Promise.all([...contentById.values()].map((record) => putContentRecord(record)));
 
   return {
     bookmarkCount: mergedBookmarks.length,
-    projectCount: mergedProjects.length
+    projectCount: mergedProjects.length,
+    contentCount: contentById.size
   };
 }
 
@@ -647,7 +872,11 @@ async function exportProject(projectId) {
 
 async function deleteBookmark(id) {
   const bookmarks = await getBookmarks();
-  await setBookmarks(bookmarks.filter((bookmark) => bookmark.id !== id));
+  const bookmark = bookmarks.find((item) => item.id === id);
+  await setBookmarks(bookmarks.filter((item) => item.id !== id));
+  if (bookmark?.contentRef) {
+    await deleteContentRecords([bookmark.contentRef]);
+  }
 
   const projects = await getProjects();
   const nextProjects = projects.map((project) => ({
@@ -775,19 +1004,12 @@ async function captureVisibleTab(windowId) {
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const bookmarks = await getBookmarks();
-  if (!Array.isArray(bookmarks)) {
-    await setBookmarks([]);
-  }
-
-  const projects = await getProjects();
-  if (!Array.isArray(projects)) {
-    await setProjects([]);
-  }
+  await ensureInitialized();
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
+    await ensureInitialized();
     switch (message?.type) {
       case "SAVE_BOOKMARK": {
         const result = await upsertBookmark(message.payload);

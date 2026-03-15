@@ -40,16 +40,38 @@ function getWordCount() {
   return mainText ? mainText.split(/\s+/).filter(Boolean).length : null;
 }
 
-function getSummary() {
-  return (
+function getSummary(fallbackText = "") {
+  const metaSummary =
     getMetaContent('meta[name="description"]') ||
     getMetaContent('meta[property="og:description"]') ||
-    getMetaContent('meta[name="twitter:description"]') ||
+    getMetaContent('meta[name="twitter:description"]');
+
+  const hostname = location.hostname.replace(/^www\./, "");
+  const isX = hostname === "x.com" || hostname === "twitter.com";
+  const normalizedFallback = fallbackText.replace(/\s+/g, " ").trim();
+
+  if (isX && normalizedFallback) {
+    return normalizedFallback;
+  }
+
+  return (
+    metaSummary ||
+    normalizedFallback ||
     shortenText(textFromSelector("article p") || textFromSelector("main p") || textFromSelector("p"))
   );
 }
 
 function extractReadablePageContent() {
+  const hostname = location.hostname.replace(/^www\./, "");
+  const isX = hostname === "x.com" || hostname === "twitter.com";
+
+  if (isX) {
+    const articleLike = document.querySelector("article");
+    const mainLike = document.querySelector("main");
+    const block = articleLike || mainLike || document.body;
+    return block?.innerText?.replace(/\n{3,}/g, "\n\n").trim() || "";
+  }
+
   const candidates = [
     ...document.querySelectorAll("article p, article li"),
     ...document.querySelectorAll("main p, main li"),
@@ -102,13 +124,15 @@ function getRuntimeMinutes() {
 }
 
 function extractCurrentPageMetadata() {
+  const capturedContent = extractReadablePageContent();
   return {
     url: location.href,
     title:
       getMetaContent('meta[property="og:title"]') ||
       getMetaContent('meta[name="twitter:title"]') ||
       document.title,
-    summary: getSummary(),
+    summary: getSummary(capturedContent.split(/\n{2,}/).find(Boolean) || ""),
+    fullDescription: capturedContent || getSummary(),
     siteName: getMetaContent('meta[property="og:site_name"]') || location.hostname.replace(/^www\./, ""),
     ogType: getMetaContent('meta[property="og:type"]'),
     thumbnailUrl:
@@ -116,7 +140,7 @@ function extractCurrentPageMetadata() {
       getMetaContent('meta[name="twitter:image"]'),
     runtimeMinutes: getRuntimeMinutes(),
     wordCount: getWordCount(),
-    capturedContent: extractReadablePageContent(),
+    capturedContent,
     pageTitle: document.title,
     contentType: document.contentType === "application/pdf" ? "pdf" : undefined,
     isPdf: document.contentType === "application/pdf" || /\.pdf($|\?)/i.test(location.href)

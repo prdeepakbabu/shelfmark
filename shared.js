@@ -55,7 +55,7 @@ export function shorten(text, max = 220) {
   return `${cleaned.slice(0, max - 1).trimEnd()}…`;
 }
 
-export function normalizeCapturedContent(text = "", max = 30000) {
+export function normalizeCapturedContent(text = "", max = 120000) {
   const cleaned = String(text || "")
     .replace(/\r/g, "")
     .replace(/[ \t]+\n/g, "\n")
@@ -279,20 +279,30 @@ export function buildBookmarkRecord({ url, notes = "", metadata = {}, existing }
   const enriched = inferTagsAndMetrics({ ...metadata, url });
   const now = new Date().toISOString();
   const normalizedUrl = enriched.normalizedUrl || normalizeUrl(url);
-
-  const title = shorten(
-    metadata.title ||
+  const fullTitle = String(
+    metadata.fullTitle ||
+      metadata.title ||
       metadata.pageTitle ||
       metadata.siteName ||
-      decodeURIComponent(normalizedUrl.split("/").pop() || normalizedUrl),
+      decodeURIComponent(normalizedUrl.split("/").pop() || normalizedUrl)
+  ).replace(/\s+/g, " ").trim();
+
+  const fullDescription = String(
+    metadata.fullDescription ||
+      metadata.summary ||
+      metadata.description ||
+      metadata.excerpt ||
+      metadata.capturedContent ||
+      `${fullTitle} saved from ${enriched.hostname || "the web"}.`
+  ).replace(/\s+/g, " ").trim();
+
+  const title = shorten(
+    fullTitle,
     120
   );
 
   const summary = shorten(
-    metadata.summary ||
-      metadata.description ||
-      metadata.excerpt ||
-      `${title} saved from ${enriched.hostname || "the web"}.`,
+    fullDescription,
     260
   );
 
@@ -308,7 +318,7 @@ export function buildBookmarkRecord({ url, notes = "", metadata = {}, existing }
     runtimeMinutes: enriched.runtimeMinutes ?? null,
     pageCount: enriched.pageCount ?? null,
     wordCount: parseMaybeNumber(metadata.wordCount) ?? existing?.wordCount ?? null,
-    capturedContent: normalizeCapturedContent(metadata.capturedContent || existing?.capturedContent || ""),
+    contentRef: metadata.contentRef || existing?.contentRef || null,
     thumbnailUrl: metadata.thumbnailUrl || existing?.thumbnailUrl || (enriched.tags.includes("youtube") ? buildYouTubeThumbnailUrl(url) : ""),
     siteName: metadata.siteName || existing?.siteName || slugFromHostname(enriched.hostname),
     hostname: enriched.hostname,

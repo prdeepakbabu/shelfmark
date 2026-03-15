@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check background.js && node --check dashboard.js && node --check popup.js && node --check shared.js && node --check content-script.js",
+    "check": "node --check background.js && node --check content-store.js && node --check dashboard.js && node --check popup.js && node --check shared.js && node --check content-script.js",
     "test": "node tests/run-tests.mjs"
   }
 }
