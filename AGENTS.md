@@ -13,6 +13,7 @@ Shelfmark is a Chrome extension for:
 - exporting projects to HTML and print-to-PDF
 - annotating exported HTML with highlights and comments
 - backing up and restoring raw extension data
+- capturing popularity metrics for supported social sources
 
 Supported content types currently include:
 
@@ -25,6 +26,7 @@ Supported content types currently include:
 
 Recent commits:
 
+- `0f22b5a` Merge PR adding popularity metrics for social bookmarks
 - `5b75270` Move large captured content to IndexedDB
 - `e48e728` Add backup import and improve YouTube export
 - `a3fa359` Initial Shelfmark extension
@@ -83,6 +85,7 @@ Used for lightweight metadata only:
 - tags
 - project image metadata / image data URLs
 - references to large source content
+- popularity metrics and compact UI fields
 
 Storage keys are defined in `shared.js`:
 
@@ -156,8 +159,35 @@ Important bookmark fields:
 - `pageCount`
 - `thumbnailUrl`
 - `contentRef`
+- `likesCount`
+- `sharesCount`
+- `thumbsUpCount`
+- `popularityCount`
 
 Do not reintroduce large full-text payloads directly into bookmark objects unless there is a deliberate architecture change.
+
+### Popularity Metrics
+
+Popularity metrics are best-effort and source-specific.
+
+Current support:
+
+- X: likes and shares / repost-style counts when available from the rendered page
+- YouTube: thumbs-up counts when available from the rendered page
+
+Current implementation split:
+
+- extraction in `content-script.js`
+- normalization and sorting in `shared.js`
+- bookmark-card rendering in `dashboard.js`
+- import preservation in `background.js`
+
+Current popularity-related sort keys:
+
+- `popularity-desc`
+- `likes-desc`
+- `shares-desc`
+- `thumbs-up-desc`
 
 ## Project Model
 
@@ -204,6 +234,7 @@ Current state:
 - later background fetches can be blocked by X and return fallback pages
 - full image capture for X articles is not implemented
 - text-only is the current strategy
+- popularity metrics for X depend on what the live rendered page exposes at save time
 
 If future work touches X export:
 
@@ -215,6 +246,7 @@ If future work touches X export:
 Current state:
 
 - title, runtime, description, and thumbnail are captured when possible
+- thumbs-up counts are captured when possible
 - export uses a media card instead of generic scraped page footer text
 - description should remain full in export even if dashboard summary is shortened
 
@@ -237,6 +269,12 @@ Backup format currently includes:
 - projects
 - content records from IndexedDB
 
+Import/export should continue to preserve:
+
+- `contentRef`
+- popularity fields
+- project associations
+
 Import behavior is merge-oriented, not destructive replacement.
 
 If future work changes schema:
@@ -258,6 +296,8 @@ This is especially important for:
 
 - X pages
 - pages with meaningful DOM text not recoverable from a simple later fetch
+- X popularity metrics
+- YouTube popularity metrics
 
 ### Manual URL save flow
 
@@ -290,6 +330,7 @@ Current coverage includes:
 - X blocked export fallback behavior
 - YouTube metadata/export behavior
 - raw backup export/import behavior
+- popularity parsing and popularity-based sorting
 
 If you change:
 
@@ -318,6 +359,11 @@ Static demo pages used to generate screenshots:
 
 If UI changes materially, screenshots and README should be updated.
 
+If sorting, filtering, or bookmark-card metadata changes, update both:
+
+- `README.md`
+- this file
+
 ## Publishing / Update Safety
 
 Important user expectation:
@@ -337,6 +383,7 @@ When making updates:
 - Keep heavy source content out of `chrome.storage.local`
 - Prefer storing references and stitching content together at export time
 - Treat X and YouTube as special-case sources; generic HTML scraping is not enough
+- Treat popularity metrics as unstable page-level metadata and back selector changes with tests
 - Preserve export quality even if UI cards remain intentionally compact
 - If a feature risks data continuity, add backup or migration support in the same branch
 - If multiple features touch the same file or subsystem, use separate `codex/*` branches and do an explicit integration pass before merge
@@ -350,3 +397,4 @@ Reasonable future improvements:
 - better import conflict reporting
 - more structured X article capture while viewing the page
 - move heavy project images to a more scalable local storage strategy if needed
+- richer social metadata coverage beyond current X/YouTube popularity metrics

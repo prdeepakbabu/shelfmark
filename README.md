@@ -12,6 +12,8 @@ It is built for mixed-source reading workflows where the things you save are not
 
 Instead of acting like a plain browser bookmark manager, Shelfmark adds metadata, tags, notes, filters, projects, screenshots, and export.
 
+It is local-first: lightweight metadata stays in Chrome extension storage, while larger captured source text is kept in IndexedDB so exports can stay rich without bloating the main bookmark records.
+
 ## What It Does
 
 - Save the current tab or a pasted URL from the popup
@@ -23,9 +25,11 @@ Instead of acting like a plain browser bookmark manager, Shelfmark adds metadata
 - Group bookmarks into projects
 - Add project summaries, long-form learnings, screenshots, and uploaded images
 - Filter and sort bookmarks by content type, tags, runtime, pages, and search terms
+- Capture popularity signals for supported social sources such as X and YouTube
 - Export a project into a single formatted HTML document
 - Print that HTML export to PDF
 - Highlight exported text and attach comments in the exported document
+- Export and import a raw JSON backup of extension data
 
 ## Screenshots
 
@@ -83,9 +87,15 @@ The Bookmarks view lets you:
 - filter by runtime
 - filter by page count
 - filter by tags
-- sort by newest, oldest, title, runtime, or pages
+- sort by newest, oldest, title, runtime, pages, or popularity metrics
 - select multiple bookmarks and open them together
 - bulk-assign selected bookmarks to a project
+
+For supported sources, bookmark cards can also display social popularity badges such as:
+
+- likes
+- shares / reposts
+- thumbs up
 
 ### 3. Build a project
 
@@ -120,6 +130,13 @@ The HTML export includes:
 - reference URLs for each source
 - inline highlighting and comments in the exported file
 
+For supported video sources, exports can also include richer source metadata such as:
+
+- full title
+- full description
+- thumbnail
+- runtime
+
 Recommended flow:
 
 1. Save links into a project
@@ -143,19 +160,38 @@ Examples:
 
 The metadata pipeline is best-effort. It works well for many standard pages, but it is still heuristic-based rather than site-specific.
 
+Popularity metrics are also best-effort. They are most reliable when you save a page while actively viewing the rendered source in Chrome.
+
 ## Storage Model
 
 This version is local-first.
 
-- Bookmarks and projects are stored in `chrome.storage.local`
-- Images and screenshots are stored in extension local storage
+- Lightweight bookmark and project metadata are stored in `chrome.storage.local`
+- Full captured source text is stored in IndexedDB
+- Images and screenshots are still stored in extension local storage
 - There is no backend account sync in the current build
+- The extension requests `unlimitedStorage` to reduce quota pressure for local-first storage
 
 That means:
 
 - your data is local to the browser profile where the extension is installed
-- large image collections will eventually hit Chrome storage limits
+- large image collections can still grow quickly because image data is heavier than text
 - Chrome sync is not being used for project data because its quota is too small for this use case
+
+## Backup And Restore
+
+Shelfmark includes a raw data backup flow in the dashboard sidebar:
+
+- `Export data` downloads a JSON backup
+- `Import data` merges a previous backup into the current local dataset
+
+The backup includes:
+
+- bookmarks
+- projects
+- full captured content records used for export
+
+This is the safest way to protect your data before large upgrades or local experimentation.
 
 ## Limits And Practical Notes
 
@@ -163,6 +199,8 @@ That means:
 - Export scraping is best-effort
 - heavily scripted pages may export partial content
 - some PDFs may export only partial text
+- X content is captured best when you bookmark while viewing the page live
+- popularity metrics depend on what the rendered page exposes at save time
 - `chrome://` pages and some restricted tabs cannot be inspected normally by extensions
 - screenshots and uploaded images increase storage usage quickly
 
