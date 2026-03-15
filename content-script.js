@@ -30,6 +30,156 @@ function parseIsoDuration(input = "") {
   return totalMinutes > 0 ? Math.ceil(totalMinutes) : null;
 }
 
+function parseCompactCount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.round(value));
+  }
+
+  const cleaned = String(value || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/,/g, "")
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  const match = cleaned.match(/(\d+(?:\.\d+)?)\s*([kmb])?/i);
+  if (!match) {
+    return null;
+  }
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  const multiplier = { k: 1e3, m: 1e6, b: 1e9 }[String(match[2] || "").toLowerCase()] || 1;
+  return Math.round(amount * multiplier);
+}
+
+function extractMetricCountFromText(text, labelPatterns = []) {
+  const normalized = String(text || "").replace(/\u00a0/g, " ").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  for (const labelPattern of labelPatterns) {
+    const forward = normalized.match(new RegExp(`(\\d+(?:[,.]\\d+)?\\s*[kmb]?)\\s*${labelPattern}`, "i"));
+    if (forward?.[1]) {
+      return parseCompactCount(forward[1]);
+    }
+
+    const reverse = normalized.match(new RegExp(`${labelPattern}[^\\d]{0,24}(\\d+(?:[,.]\\d+)?\\s*[kmb]?)`, "i"));
+    if (reverse?.[1]) {
+      return parseCompactCount(reverse[1]);
+    }
+  }
+
+  return null;
+}
+
+function calculatePopularityCount({ likesCount = null, sharesCount = null, thumbsUpCount = null } = {}) {
+  const primaryReactionCount = Math.max(likesCount || 0, thumbsUpCount || 0);
+  const shareCount = sharesCount || 0;
+  const total = primaryReactionCount + shareCount;
+  return total > 0 ? total : null;
+}
+
+function collectNodeTexts(node) {
+  if (!node) {
+    return [];
+  }
+
+  return [
+    node.getAttribute?.("aria-label"),
+    node.getAttribute?.("title"),
+    node.innerText,
+    node.textContent,
+    node.parentElement?.getAttribute?.("aria-label"),
+    node.parentElement?.innerText
+  ].filter(Boolean);
+}
+
+function extractCountFromNodes(nodes, labelPatterns, allowBareNumber = false) {
+  for (const node of nodes) {
+    for (const text of collectNodeTexts(node)) {
+      const labeledCount = extractMetricCountFromText(text, labelPatterns);
+      if (labeledCount !== null) {
+        return labeledCount;
+      }
+
+      if (allowBareNumber) {
+        const bareCount = parseCompactCount(text);
+        if (bareCount !== null) {
+          return bareCount;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function getPopularityMetrics() {
+  const hostname = location.hostname.replace(/^www\./, "");
+  const isYouTube = hostname === "youtu.be" || hostname.endsWith("youtube.com");
+  const isX = hostname === "x.com" || hostname === "twitter.com";
+
+  if (isYouTube) {
+    const thumbsUpCount = extractCountFromNodes(
+      [
+        ...document.querySelectorAll('segmented-like-dislike-button-view-model button'),
+        ...document.querySelectorAll('#top-level-buttons-computed button'),
+        ...document.querySelectorAll('button[aria-label*="like" i]')
+      ],
+      ["likes?", "thumbs?\\s*ups?", "other people"],
+      true
+    );
+
+    return {
+      likesCount: null,
+      sharesCount: null,
+      thumbsUpCount,
+      popularityCount: calculatePopularityCount({ thumbsUpCount })
+    };
+  }
+
+  if (isX) {
+    const scope = document.querySelector("article") || document.body || document.documentElement;
+    const likesCount = extractCountFromNodes(
+      [
+        ...scope.querySelectorAll('[data-testid="like"], [data-testid="unlike"]'),
+        ...scope.querySelectorAll('button[aria-label*="Like" i]')
+      ],
+      ["likes?"],
+      true
+    );
+    const sharesCount = extractCountFromNodes(
+      [
+        ...scope.querySelectorAll('[data-testid="retweet"], [data-testid="unretweet"], [data-testid="share"]'),
+        ...scope.querySelectorAll('button[aria-label*="Repost" i], button[aria-label*="Share" i]')
+      ],
+      ["reposts?", "shares?"],
+      true
+    );
+
+    return {
+      likesCount,
+      sharesCount,
+      thumbsUpCount: null,
+      popularityCount: calculatePopularityCount({ likesCount, sharesCount })
+    };
+  }
+
+  return {
+    likesCount: null,
+    sharesCount: null,
+    thumbsUpCount: null,
+    popularityCount: null
+  };
+}
+
 function getWordCount() {
   const mainText =
     textFromSelector("article") ||
@@ -125,6 +275,7 @@ function getRuntimeMinutes() {
 
 function extractCurrentPageMetadata() {
   const capturedContent = extractReadablePageContent();
+  const popularity = getPopularityMetrics();
   return {
     url: location.href,
     title:
@@ -140,6 +291,10 @@ function extractCurrentPageMetadata() {
       getMetaContent('meta[name="twitter:image"]'),
     runtimeMinutes: getRuntimeMinutes(),
     wordCount: getWordCount(),
+    likesCount: popularity.likesCount,
+    sharesCount: popularity.sharesCount,
+    thumbsUpCount: popularity.thumbsUpCount,
+    popularityCount: popularity.popularityCount,
     capturedContent,
     pageTitle: document.title,
     contentType: document.contentType === "application/pdf" ? "pdf" : undefined,

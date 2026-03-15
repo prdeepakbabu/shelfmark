@@ -4,7 +4,8 @@ import {
   PROJECTS_KEY,
   STORAGE_KEY,
   classifyUrl,
-  normalizeUrl
+  normalizeUrl,
+  sortBookmarks
 } from "../shared.js";
 
 const storageData = {
@@ -136,6 +137,28 @@ globalThis.fetch = async (url) => {
           headers: { "content-type": "text/html; charset=utf-8" }
         }
       );
+    case "https://x.com/deepak/status/456":
+      return new Response(
+        `<!doctype html>
+        <html>
+          <head>
+            <title>Deepak on X</title>
+            <meta property="og:title" content="Deepak on X">
+            <meta property="og:description" content="A post about ranking research links by popularity.">
+          </head>
+          <body>
+            <article>
+              <button data-testid="like" aria-label="128 Likes. Like"></button>
+              <button data-testid="retweet" aria-label="23 Reposts. Repost"></button>
+              <p>Ranking research links by popularity gives you a quick signal for what is resonating.</p>
+            </article>
+          </body>
+        </html>`,
+        {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" }
+        }
+      );
     case "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Ddemo123&format=json":
       return new Response(
         JSON.stringify({
@@ -161,7 +184,9 @@ globalThis.fetch = async (url) => {
             <meta property="og:site_name" content="YouTube">
             <meta property="og:type" content="video.other">
             <meta itemprop="duration" content="PT42M12S">
+            <script type="application/ld+json">{"interactionStatistic":[{"interactionType":{"@type":"http://schema.org/LikeAction"},"userInteractionCount":"12500"}]}</script>
             <script>var ytInitialPlayerResponse = {"videoDetails":{"shortDescription":"A walkthrough of orchestrating agent teams, harnesses, and coordination loops. This version includes the longer description text that should be preserved for export rather than being truncated in the UI card."}};</script>
+            <script>var ytInitialData = {"topLevelButtons":[{"segmentedLikeDislikeButtonViewModel":{"likeButtonViewModel":{"likeButtonViewModel":{"toggleButtonViewModel":{"toggleButtonViewModel":{"defaultButtonViewModel":{"buttonViewModel":{"accessibilityText":"12.5K likes"}}}}}}}]};</script>
           </head>
           <body>
             <main>
@@ -371,6 +396,8 @@ await run("YouTube bookmarks preserve title description runtime and thumbnail in
   assert.equal(bookmarkResponse.bookmark.contentType, "video");
   assert.equal(bookmarkResponse.bookmark.runtimeMinutes, 43);
   assert.match(bookmarkResponse.bookmark.thumbnailUrl, /demo123/);
+  assert.equal(bookmarkResponse.bookmark.thumbsUpCount, 12500);
+  assert.equal(bookmarkResponse.bookmark.popularityCount, 12500);
   assert.match(bookmarkResponse.bookmark.summary, /orchestrating agent teams/);
   assert.ok(bookmarkResponse.bookmark.contentRef);
 
@@ -396,6 +423,80 @@ await run("YouTube bookmarks preserve title description runtime and thumbnail in
   assert.match(exportResponse.html, /longer description text that should be preserved for export/);
 });
 
+await run("X posts and X articles preserve popularity metrics from saved metadata", async () => {
+  const postResponse = await sendMessage("SAVE_BOOKMARK", {
+    url: "https://x.com/deepak/status/456",
+    notes: "Check engagement before adding to project.",
+    metadata: {
+      title: "Deepak on X",
+      summary: "A post about ranking research links by popularity.",
+      likesCount: "128",
+      sharesCount: "23",
+      capturedContent: "Ranking research links by popularity gives you a quick signal for what is resonating."
+    }
+  });
+
+  assert.equal(postResponse.ok, true);
+  assert.equal(postResponse.bookmark.likesCount, 128);
+  assert.equal(postResponse.bookmark.sharesCount, 23);
+  assert.equal(postResponse.bookmark.popularityCount, 151);
+
+  const articleResponse = await sendMessage("SAVE_BOOKMARK", {
+    url: "https://x.com/i/articles/123",
+    notes: "Longform post with strong engagement.",
+    metadata: {
+      title: "Distillation notes on X",
+      summary: "A longform X article about model distillation.",
+      contentType: "article",
+      likesCount: "4.2K",
+      sharesCount: "320",
+      capturedContent: "Distillation works best when the student target is specific."
+    }
+  });
+
+  assert.equal(articleResponse.ok, true);
+  assert.equal(articleResponse.bookmark.likesCount, 4200);
+  assert.equal(articleResponse.bookmark.sharesCount, 320);
+  assert.equal(articleResponse.bookmark.popularityCount, 4520);
+});
+
+await run("sortBookmarks supports popularity sorts with unknown metrics last", async () => {
+  const sample = [
+    {
+      id: "a",
+      title: "Alpha",
+      createdAt: "2026-03-14T10:00:00.000Z",
+      likesCount: 12,
+      sharesCount: 5,
+      thumbsUpCount: null,
+      popularityCount: 17
+    },
+    {
+      id: "b",
+      title: "Beta",
+      createdAt: "2026-03-14T11:00:00.000Z",
+      likesCount: null,
+      sharesCount: null,
+      thumbsUpCount: 900,
+      popularityCount: 900
+    },
+    {
+      id: "c",
+      title: "Gamma",
+      createdAt: "2026-03-14T12:00:00.000Z",
+      likesCount: null,
+      sharesCount: null,
+      thumbsUpCount: null,
+      popularityCount: null
+    }
+  ];
+
+  assert.deepEqual(sortBookmarks(sample, "popularity-desc").map((item) => item.id), ["b", "a", "c"]);
+  assert.deepEqual(sortBookmarks(sample, "likes-desc").map((item) => item.id), ["a", "b", "c"]);
+  assert.deepEqual(sortBookmarks(sample, "shares-desc").map((item) => item.id), ["a", "b", "c"]);
+  assert.deepEqual(sortBookmarks(sample, "thumbs-up-desc").map((item) => item.id), ["b", "a", "c"]);
+});
+
 await run("raw backup export and import merge data safely", async () => {
   const exportResponse = await sendMessage("EXPORT_DATA");
   assert.equal(exportResponse.ok, true);
@@ -413,7 +514,9 @@ await run("raw backup export and import merge data safely", async () => {
         title: "Imported article",
         summary: "Imported summary",
         tags: ["article", "blog"],
-        contentType: "article"
+        contentType: "article",
+        likesCount: "55",
+        sharesCount: "8"
       }
     ],
     projects: [
@@ -429,7 +532,11 @@ await run("raw backup export and import merge data safely", async () => {
   assert.equal(importResponse.ok, true);
 
   const stored = await chrome.storage.local.get([STORAGE_KEY, PROJECTS_KEY]);
-  assert.ok(stored[STORAGE_KEY].some((item) => item.title === "Imported article"));
+  const importedBookmark = stored[STORAGE_KEY].find((item) => item.title === "Imported article");
+  assert.ok(importedBookmark);
+  assert.equal(importedBookmark.likesCount, 55);
+  assert.equal(importedBookmark.sharesCount, 8);
+  assert.equal(importedBookmark.popularityCount, 63);
   assert.ok(stored[PROJECTS_KEY].some((item) => item.name === "Imported project"));
 });
 

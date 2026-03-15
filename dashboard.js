@@ -1,6 +1,7 @@
 import {
   PROJECTS_KEY,
   STORAGE_KEY,
+  formatCompactNumber,
   formatPages,
   formatRuntime,
   matchesFilters,
@@ -126,6 +127,24 @@ function renderTagFilters() {
   }
 }
 
+function buildPopularityBadges(bookmark) {
+  const metrics = [
+    bookmark.likesCount ? `${formatCompactNumber(bookmark.likesCount)} likes` : "",
+    bookmark.sharesCount ? `${formatCompactNumber(bookmark.sharesCount)} shares` : "",
+    bookmark.thumbsUpCount ? `${formatCompactNumber(bookmark.thumbsUpCount)} thumbs up` : ""
+  ].filter(Boolean);
+
+  if (!metrics.length) {
+    return "";
+  }
+
+  return `
+    <div class="metric-row" aria-label="Popularity metrics">
+      ${metrics.map((metric) => `<span class="metric-pill">${escapeHtml(metric)}</span>`).join("")}
+    </div>
+  `;
+}
+
 function renderBookmarkCard(bookmark) {
   const projectMembership = state.projects.filter((project) => (project.bookmarkIds || []).includes(bookmark.id));
   const article = document.createElement("article");
@@ -147,6 +166,7 @@ function renderBookmarkCard(bookmark) {
     <div class="tag-row">
       ${(bookmark.tags || []).map((tag) => `<span class="tag-pill">${escapeHtml(tag)}</span>`).join("")}
     </div>
+    ${buildPopularityBadges(bookmark)}
     ${
       projectMembership.length
         ? `<div class="meta-line">${projectMembership.map((project) => `Project: ${escapeHtml(project.name)}`).join(" · ")}</div>`

@@ -205,6 +205,7 @@ textarea {
 
 .tag-grid,
 .tag-row,
+.metric-row,
 .project-list,
 .project-image-grid,
 .project-bookmark-list {
@@ -214,7 +215,8 @@ textarea {
 }
 
 .tag-chip,
-.tag-pill {
+.tag-pill,
+.metric-pill {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -237,6 +239,13 @@ textarea {
 
 .tag-pill {
   padding: 6px 10px;
+}
+
+.metric-pill {
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--ink);
+  border: 1px solid rgba(31, 36, 48, 0.08);
 }
 
 .bookmark-list,

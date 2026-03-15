@@ -12,6 +12,7 @@ import {
   extractReadableContentFromHtml,
   extractHtmlMetadataFromText,
   isBlockedSocialExportHtml,
+  normalizePopularityMetrics,
   normalizeUrl,
   slugifyFilePart,
   shorten
@@ -399,6 +400,7 @@ async function migrateInlineBookmarkContent() {
 
 function normalizeImportedBookmark(bookmark = {}) {
   const now = new Date().toISOString();
+  const popularity = normalizePopularityMetrics(bookmark);
   return {
     id: bookmark.id || crypto.randomUUID(),
     url: bookmark.url || "",
@@ -411,6 +413,10 @@ function normalizeImportedBookmark(bookmark = {}) {
     runtimeMinutes: toMaybeNumber(bookmark.runtimeMinutes),
     pageCount: toMaybeNumber(bookmark.pageCount),
     wordCount: toMaybeNumber(bookmark.wordCount),
+    likesCount: popularity.likesCount,
+    sharesCount: popularity.sharesCount,
+    thumbsUpCount: popularity.thumbsUpCount,
+    popularityCount: popularity.popularityCount,
     contentRef: bookmark.contentRef || null,
     thumbnailUrl: String(bookmark.thumbnailUrl || "").trim(),
     siteName: String(bookmark.siteName || "").trim(),
