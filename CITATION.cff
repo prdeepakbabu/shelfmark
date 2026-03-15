@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use Shelfmark, please cite it using the metadata below."
+title: "Shelfmark"
+type: software
+version: "0.1.0"
+authors:
+  - family-names: "Piskala"
+    given-names: "Deepak"
+abstract: "Chrome extension for bookmarking pages, videos, PDFs, papers, and X articles with notes, tagging, projects, and export to HTML/PDF."
+license: "Proprietary"
+keywords:
+  - chrome extension
+  - bookmarks
+  - knowledge management
+  - research workflow
+  - project organization
+  - export

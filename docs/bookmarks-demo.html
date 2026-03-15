@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelfmark Bookmarks Demo</title>
+    <link rel="stylesheet" href="../dashboard.css">
+    <style>
+      body {
+        min-height: 1400px;
+      }
+
+      .main-panel {
+        min-width: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <aside class="sidebar">
+        <section class="sidebar-card">
+          <p class="eyebrow">Shelfmark</p>
+          <h1>Research shelf</h1>
+          <p class="lede">Save raw links as bookmarks, then group them into projects with notes, learnings, screenshots, and uploaded images.</p>
+        </section>
+
+        <section class="sidebar-card">
+          <p class="eyebrow">Workspace</p>
+          <div class="view-switch">
+            <button class="toggle-button active" type="button">Bookmarks</button>
+            <button class="toggle-button" type="button">Projects</button>
+          </div>
+        </section>
+
+        <section class="sidebar-card controls">
+          <label class="control">
+            <span>Search</span>
+            <input type="search" value="paper">
+          </label>
+
+          <label class="control">
+            <span>Content type</span>
+            <select>
+              <option>Articles</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Runtime</span>
+            <select>
+              <option>6-20 min</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Pages</span>
+            <select>
+              <option>11-30 pages</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Sort</span>
+            <select>
+              <option>Newest first</option>
+            </select>
+          </label>
+
+          <div class="control">
+            <span>Tags</span>
+            <div class="tag-grid">
+              <button class="tag-chip active" type="button">paper</button>
+              <button class="tag-chip active" type="button">pdf</button>
+              <button class="tag-chip" type="button">youtube</button>
+              <button class="tag-chip" type="button">x</button>
+            </div>
+          </div>
+
+          <button class="ghost-button" type="button">Clear filters</button>
+        </section>
+      </aside>
+
+      <section class="main-panel">
+        <header class="toolbar">
+          <div>
+            <p class="eyebrow">Workspace view</p>
+            <h2>3 of 12 bookmarks</h2>
+          </div>
+          <div class="toolbar-actions">
+            <select class="toolbar-select">
+              <option>Add selected to project…</option>
+              <option>Model evaluation</option>
+            </select>
+            <button class="ghost-button" type="button">Add to project</button>
+            <button class="ghost-button" type="button">Select visible</button>
+            <button class="ghost-button" type="button">Clear selection</button>
+            <button class="primary-button" type="button">Open selected</button>
+          </div>
+        </header>
+
+        <section class="bookmark-list">
+          <article class="bookmark-card">
+            <div class="bookmark-head">
+              <input class="checkbox" checked type="checkbox" aria-label="Select bookmark">
+              <div>
+                <a class="bookmark-title" href="#">
+                  <h3>OpenAI o3 System Card</h3>
+                </a>
+                <p class="bookmark-url">https://cdn.openai.com/research-covers/o3/o3-system-card.pdf</p>
+              </div>
+              <div class="meta-line">pdf</div>
+            </div>
+            <p class="bookmark-summary">System card covering training approach, evaluations, refusal behavior, and safety mitigations for the o3 model family.</p>
+            <p class="bookmark-notes">Review this before writing the safety export summary.</p>
+            <div class="tag-row">
+              <span class="tag-pill">openai</span>
+              <span class="tag-pill">paper</span>
+              <span class="tag-pill">pdf</span>
+            </div>
+            <div class="meta-line">
+              <span>18 min read</span>
+              <span>24 pages</span>
+              <span>Saved Mar 15, 2026, 9:12 AM</span>
+            </div>
+            <div class="bookmark-actions">
+              <button class="card-button" type="button">Open</button>
+              <button class="card-button" type="button">Edit note</button>
+              <button class="link-button" type="button">Delete</button>
+            </div>
+          </article>
+
+          <article class="bookmark-card">
+            <div class="bookmark-head">
+              <input class="checkbox" checked type="checkbox" aria-label="Select bookmark">
+              <div>
+                <a class="bookmark-title" href="#">
+                  <h3>Training Language Models to Follow Instructions</h3>
+                </a>
+                <p class="bookmark-url">https://arxiv.org/abs/2203.02155</p>
+              </div>
+              <div class="meta-line">article</div>
+            </div>
+            <p class="bookmark-summary">Instruction tuning paper with experimental setup, benchmark deltas, and practical lessons for aligning general-purpose models.</p>
+            <div class="tag-row">
+              <span class="tag-pill">arxiv</span>
+              <span class="tag-pill">article</span>
+              <span class="tag-pill">paper</span>
+            </div>
+            <div class="meta-line">
+              <span>14 min read</span>
+              <span>18 pages</span>
+              <span>Saved Mar 14, 2026, 4:05 PM</span>
+            </div>
+            <div class="bookmark-actions">
+              <button class="card-button" type="button">Open</button>
+              <button class="card-button" type="button">Edit note</button>
+              <button class="link-button" type="button">Delete</button>
+            </div>
+          </article>
+
+          <article class="bookmark-card">
+            <div class="bookmark-head">
+              <input class="checkbox" type="checkbox" aria-label="Select bookmark">
+              <div>
+                <a class="bookmark-title" href="#">
+                  <h3>Long-context evaluation walkthrough</h3>
+                </a>
+                <p class="bookmark-url">https://www.youtube.com/watch?v=abcdefghijk</p>
+              </div>
+              <div class="meta-line">video</div>
+            </div>
+            <p class="bookmark-summary">A practical walkthrough of evaluation setup choices, runtime tradeoffs, and benchmark interpretation.</p>
+            <div class="tag-row">
+              <span class="tag-pill">video</span>
+              <span class="tag-pill">youtube</span>
+            </div>
+            <div class="meta-line">
+              <span>42 min runtime</span>
+              <span>Pages unknown</span>
+              <span>Saved Mar 12, 2026, 8:34 PM</span>
+            </div>
+            <div class="bookmark-actions">
+              <button class="card-button" type="button">Open</button>
+              <button class="card-button" type="button">Edit note</button>
+              <button class="link-button" type="button">Delete</button>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

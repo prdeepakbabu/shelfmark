@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelfmark</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup-shell">
+      <section class="hero">
+        <p class="eyebrow">Shelfmark</p>
+        <h1>Save the page with context.</h1>
+        <p class="subtitle">Bookmark videos, papers, PDFs, blogs, and X articles with tags and sortable metadata.</p>
+      </section>
+
+      <section class="panel current-tab-panel">
+        <div class="panel-header">
+          <div>
+            <p class="section-label">Current page</p>
+            <h2 id="currentTitle">Detecting tab…</h2>
+          </div>
+          <button id="openDashboard" class="ghost-button" type="button">Dashboard</button>
+        </div>
+        <p id="currentUrl" class="muted"></p>
+        <label class="field">
+          <span>Why are you saving this?</span>
+          <textarea id="notes" rows="3" placeholder="Add your own note, reminder, or takeaway."></textarea>
+        </label>
+        <div class="project-panel">
+          <p class="section-label">Project</p>
+          <label class="field compact-field">
+            <span>Add bookmark to an existing project</span>
+            <select id="projectSelect">
+              <option value="">No project</option>
+            </select>
+          </label>
+          <label class="field compact-field">
+            <span>Or create a new project</span>
+            <input id="newProjectName" type="text" placeholder="AI reading list, startup research, climate papers">
+          </label>
+          <label class="checkbox-row">
+            <input id="captureScreenshot" type="checkbox">
+            <span>Capture the visible tab as a project image</span>
+          </label>
+        </div>
+        <button id="saveCurrentTab" class="primary-button" type="button">Bookmark current page</button>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header compact">
+          <div>
+            <p class="section-label">Manual URL</p>
+            <h2>Add something not currently open</h2>
+          </div>
+        </div>
+        <label class="field">
+          <span>URL</span>
+          <input id="manualUrl" type="url" placeholder="https://example.com/article-or-video">
+        </label>
+        <button id="saveManualUrl" class="secondary-button" type="button">Bookmark pasted URL</button>
+      </section>
+
+      <p id="status" class="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

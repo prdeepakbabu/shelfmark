@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelfmark Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css">
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <aside class="sidebar">
+        <section class="sidebar-card">
+          <p class="eyebrow">Shelfmark</p>
+          <h1>Research shelf</h1>
+          <p class="lede">Save raw links as bookmarks, then group them into projects with notes, learnings, screenshots, and uploaded images.</p>
+        </section>
+
+        <section class="sidebar-card">
+          <p class="eyebrow">Workspace</p>
+          <div class="view-switch">
+            <button id="showBookmarksView" class="toggle-button active" type="button">Bookmarks</button>
+            <button id="showProjectsView" class="toggle-button" type="button">Projects</button>
+          </div>
+        </section>
+
+        <section id="bookmarkControlsCard" class="sidebar-card controls">
+          <label class="control">
+            <span>Search</span>
+            <input id="searchInput" type="search" placeholder="Title, note, summary, tag">
+          </label>
+
+          <label class="control">
+            <span>Content type</span>
+            <select id="contentTypeFilter">
+              <option value="all">All</option>
+              <option value="article">Articles</option>
+              <option value="video">Videos</option>
+              <option value="pdf">PDFs</option>
+              <option value="page">Pages</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Runtime</span>
+            <select id="runtimeFilter">
+              <option value="all">Any</option>
+              <option value="short">Up to 5 min</option>
+              <option value="medium">6-20 min</option>
+              <option value="long">21-60 min</option>
+              <option value="epic">Over 60 min</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Pages</span>
+            <select id="pagesFilter">
+              <option value="all">Any</option>
+              <option value="short">Up to 10 pages</option>
+              <option value="medium">11-30 pages</option>
+              <option value="long">31+ pages</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Sort</span>
+            <select id="sortSelect">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title">Title A-Z</option>
+              <option value="runtime-asc">Shortest runtime</option>
+              <option value="runtime-desc">Longest runtime</option>
+              <option value="pages-asc">Fewest pages</option>
+              <option value="pages-desc">Most pages</option>
+            </select>
+          </label>
+
+          <div class="control">
+            <span>Tags</span>
+            <div id="tagFilters" class="tag-grid"></div>
+          </div>
+
+          <button id="clearFilters" class="ghost-button" type="button">Clear filters</button>
+        </section>
+
+        <section id="projectEditorCard" class="sidebar-card controls hidden">
+          <p class="eyebrow">Project editor</p>
+          <label class="control">
+            <span>Project name</span>
+            <input id="projectNameInput" type="text" placeholder="Agent ideas, literature review, product research">
+          </label>
+
+          <label class="control">
+            <span>Project summary</span>
+            <textarea id="projectDescriptionInput" rows="3" placeholder="What is this project for?"></textarea>
+          </label>
+
+          <label class="control">
+            <span>Learnings / notes</span>
+            <textarea id="projectLearningsInput" rows="6" placeholder="Capture takeaways, open questions, next steps."></textarea>
+          </label>
+
+          <div class="button-row">
+            <button id="newProjectButton" class="ghost-button" type="button">New project</button>
+            <button id="saveProjectButton" class="primary-button" type="button">Save project</button>
+          </div>
+
+          <button id="deleteProjectButton" class="link-button" type="button">Delete project</button>
+
+          <label class="control">
+            <span>Add images</span>
+            <input id="projectImageInput" type="file" accept="image/*" multiple>
+          </label>
+          <p class="fine-print">Use the popup if you want to capture the current tab as a screenshot and send it straight into a project.</p>
+        </section>
+      </aside>
+
+      <section class="main-panel">
+        <header class="toolbar">
+          <div>
+            <p class="eyebrow">Workspace view</p>
+            <h2 id="resultsSummary">0 bookmarks</h2>
+          </div>
+          <div id="bookmarkToolbarActions" class="toolbar-actions">
+            <select id="projectAssignmentSelect" class="toolbar-select">
+              <option value="">Add selected to project…</option>
+            </select>
+            <button id="addSelectedToProject" class="ghost-button" type="button" disabled>Add to project</button>
+            <button id="selectVisible" class="ghost-button" type="button">Select visible</button>
+            <button id="clearSelection" class="ghost-button" type="button">Clear selection</button>
+            <button id="openSelected" class="primary-button" type="button" disabled>Open selected</button>
+          </div>
+        </header>
+
+        <div id="contentRoot"></div>
+      </section>
+    </main>
+    <script type="module" src="dashboard.js"></script>
+  </body>
+</html>

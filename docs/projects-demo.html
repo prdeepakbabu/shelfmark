@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelfmark Projects Demo</title>
+    <link rel="stylesheet" href="../dashboard.css">
+    <style>
+      body {
+        min-height: 1400px;
+      }
+
+      .demo-img {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 16px;
+        border: 1px solid rgba(31, 36, 48, 0.12);
+        object-fit: cover;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <aside class="sidebar">
+        <section class="sidebar-card">
+          <p class="eyebrow">Shelfmark</p>
+          <h1>Research shelf</h1>
+          <p class="lede">Save raw links as bookmarks, then group them into projects with notes, learnings, screenshots, and uploaded images.</p>
+        </section>
+
+        <section class="sidebar-card">
+          <p class="eyebrow">Workspace</p>
+          <div class="view-switch">
+            <button class="toggle-button" type="button">Bookmarks</button>
+            <button class="toggle-button active" type="button">Projects</button>
+          </div>
+        </section>
+
+        <section class="sidebar-card controls">
+          <p class="eyebrow">Project editor</p>
+          <label class="control">
+            <span>Project name</span>
+            <input type="text" value="Model evaluation">
+          </label>
+
+          <label class="control">
+            <span>Project summary</span>
+            <textarea rows="3">Collect papers, videos, and export-ready notes for a model safety review.</textarea>
+          </label>
+
+          <label class="control">
+            <span>Learnings / notes</span>
+            <textarea rows="7">The current export should combine project notes with cleaned source text. Focus on refusal behavior, eval gaps, and deployment mitigations.</textarea>
+          </label>
+
+          <div class="button-row">
+            <button class="ghost-button" type="button">New project</button>
+            <button class="primary-button" type="button">Save project</button>
+          </div>
+
+          <button class="link-button" type="button">Delete project</button>
+
+          <label class="control">
+            <span>Add images</span>
+            <input type="file">
+          </label>
+          <p class="fine-print">Use the popup if you want to capture the current tab as a screenshot and send it straight into a project.</p>
+        </section>
+      </aside>
+
+      <section class="main-panel">
+        <header class="toolbar">
+          <div>
+            <p class="eyebrow">Workspace view</p>
+            <h2>2 projects</h2>
+          </div>
+        </header>
+
+        <section class="project-main-grid">
+          <section class="project-list">
+            <article class="project-card active">
+              <p class="eyebrow">Project</p>
+              <h3>Model evaluation</h3>
+              <p class="project-text">Safety notes, papers, YouTube explainers, screenshots, and export drafts.</p>
+              <div class="project-meta">
+                <span>6 links</span>
+                <span>2 images</span>
+              </div>
+            </article>
+
+            <article class="project-card">
+              <p class="eyebrow">Project</p>
+              <h3>Reading queue</h3>
+              <p class="project-text">Loose articles to review and triage later.</p>
+              <div class="project-meta">
+                <span>11 links</span>
+                <span>0 images</span>
+              </div>
+            </article>
+          </section>
+
+          <section class="project-detail-panel">
+            <div class="project-header-actions">
+              <div>
+                <p class="eyebrow">Project detail</p>
+                <h3>Model evaluation</h3>
+              </div>
+              <div class="project-header-actions">
+                <button class="ghost-button" type="button">Export project</button>
+                <button class="ghost-button" type="button">Export PDF</button>
+                <button class="primary-button" type="button">Open all links</button>
+              </div>
+            </div>
+
+            <section class="project-detail-section">
+              <h4>Summary</h4>
+              <p class="project-text">Collect papers, videos, notes, and screenshots for a safety review that can be exported as a single annotated document.</p>
+            </section>
+
+            <section class="project-detail-section">
+              <h4>Learnings</h4>
+              <p class="project-text">Most useful flow: bookmark from popup, add custom context, assign into the project, then export once the notes are stable enough to share.</p>
+            </section>
+
+            <section class="project-detail-section">
+              <h4>Linked bookmarks</h4>
+              <div class="project-bookmark-list">
+                <article class="project-bookmark-row">
+                  <a class="project-link" href="#"><strong>OpenAI o3 System Card</strong></a>
+                  <p class="project-text">PDF tagged as paper and pdf with page count and reading-time estimate.</p>
+                  <div class="project-bookmark-actions">
+                    <button class="card-button" type="button">Open</button>
+                    <button class="link-button" type="button">Remove from project</button>
+                  </div>
+                </article>
+
+                <article class="project-bookmark-row">
+                  <a class="project-link" href="#"><strong>Long-context evaluation walkthrough</strong></a>
+                  <p class="project-text">Video bookmark with runtime metadata, custom note, and export reference URL.</p>
+                  <div class="project-bookmark-actions">
+                    <button class="card-button" type="button">Open</button>
+                    <button class="link-button" type="button">Remove from project</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="project-detail-section">
+              <h4>Images</h4>
+              <div class="project-image-grid">
+                <article class="project-image-card">
+                  <img
+                    class="demo-img"
+                    alt="Screenshot of a PDF reader"
+                    src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'><rect width='800' height='600' fill='%23f6f1e7'/><rect x='72' y='48' width='656' height='504' rx='24' fill='white' stroke='%23d8d3ca'/><rect x='108' y='92' width='250' height='18' rx='9' fill='%231f2430'/><rect x='108' y='136' width='584' height='12' rx='6' fill='%23b6b4ae'/><rect x='108' y='166' width='584' height='12' rx='6' fill='%23d5d1ca'/><rect x='108' y='196' width='584' height='12' rx='6' fill='%23d5d1ca'/><rect x='108' y='244' width='220' height='184' rx='18' fill='%230f766e'/><rect x='356' y='244' width='336' height='24' rx='12' fill='%23c2410c' fill-opacity='0.14'/><rect x='356' y='286' width='302' height='14' rx='7' fill='%23d5d1ca'/><rect x='356' y='316' width='286' height='14' rx='7' fill='%23d5d1ca'/><rect x='356' y='346' width='312' height='14' rx='7' fill='%23d5d1ca'/><rect x='356' y='388' width='180' height='36' rx='18' fill='%230f766e'/></svg>">
+                  <div>
+                    <strong>Visible tab capture</strong>
+                    <p class="project-text">Captured from the popup and attached to the project.</p>
+                  </div>
+                  <button class="link-button" type="button">Delete image</button>
+                </article>
+
+                <article class="project-image-card">
+                  <img
+                    class="demo-img"
+                    alt="Annotated export preview"
+                    src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 600'><rect width='800' height='600' fill='%23f6f1e7'/><rect x='72' y='48' width='656' height='504' rx='24' fill='white' stroke='%23d8d3ca'/><rect x='108' y='92' width='400' height='18' rx='9' fill='%231f2430'/><rect x='108' y='138' width='584' height='14' rx='7' fill='%23d5d1ca'/><rect x='108' y='172' width='480' height='14' rx='7' fill='%23d5d1ca'/><rect x='108' y='222' width='300' height='34' rx='10' fill='%23facc15' fill-opacity='0.55'/><rect x='108' y='276' width='584' height='14' rx='7' fill='%23d5d1ca'/><rect x='108' y='306' width='552' height='14' rx='7' fill='%23d5d1ca'/><rect x='108' y='336' width='320' height='14' rx='7' fill='%23d5d1ca'/><rect x='462' y='222' width='186' height='120' rx='18' fill='%23ecfdf5' stroke='%230f766e'/><rect x='490' y='252' width='130' height='12' rx='6' fill='%230f766e'/><rect x='490' y='282' width='108' height='12' rx='6' fill='%239ca3af'/><rect x='108' y='404' width='180' height='36' rx='18' fill='%230f766e'/></svg>">
+                  <div>
+                    <strong>Export preview</strong>
+                    <p class="project-text">HTML export supports highlighting, comments, and print-to-PDF.</p>
+                  </div>
+                  <button class="link-button" type="button">Delete image</button>
+                </article>
+              </div>
+            </section>
+          </section>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

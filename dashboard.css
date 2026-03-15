@@ -1,0 +1,380 @@
+:root {
+  color-scheme: light;
+  --bg: #fbf7ef;
+  --ink: #1f2430;
+  --muted: #6f716f;
+  --line: rgba(31, 36, 48, 0.12);
+  --panel: rgba(255, 255, 255, 0.78);
+  --accent: #0f766e;
+  --accent-soft: rgba(15, 118, 110, 0.12);
+  --accent-warm: #c2410c;
+  --shadow: 0 20px 42px rgba(75, 54, 28, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(255, 196, 117, 0.28), transparent 25%),
+    radial-gradient(circle at right center, rgba(14, 116, 144, 0.14), transparent 24%),
+    linear-gradient(180deg, #faf5ea 0%, #f6f1e7 100%);
+}
+
+.dashboard-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+
+.sidebar,
+.main-panel {
+  min-width: 0;
+}
+
+.sidebar-card,
+.toolbar,
+.bookmark-card,
+.empty-state,
+.project-card,
+.project-detail-panel,
+.project-bookmark-row,
+.project-image-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.sidebar-card {
+  padding: 18px;
+}
+
+.sidebar-card + .sidebar-card {
+  margin-top: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+h1 {
+  font-size: 34px;
+  line-height: 1.05;
+  margin-bottom: 10px;
+}
+
+h2 {
+  font-size: 26px;
+}
+
+h3 {
+  font-size: 20px;
+}
+
+.lede,
+.fine-print,
+.bookmark-summary,
+.bookmark-notes,
+.meta-line,
+.project-meta,
+.project-text,
+.project-empty {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.controls {
+  display: grid;
+  gap: 14px;
+}
+
+.control span {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 13px;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+textarea {
+  resize: vertical;
+}
+
+.hidden {
+  display: none;
+}
+
+.view-switch,
+.button-row,
+.toolbar-actions,
+.bookmark-actions,
+.project-header-actions,
+.project-bookmark-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.toggle-button,
+.ghost-button,
+.primary-button,
+.card-button,
+.link-button {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggle-button,
+.ghost-button,
+.card-button {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.toggle-button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.primary-button {
+  background: var(--accent);
+  color: white;
+}
+
+.link-button {
+  background: transparent;
+  color: var(--accent-warm);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.toolbar-select {
+  max-width: 220px;
+}
+
+.tag-grid,
+.tag-row,
+.project-list,
+.project-image-grid,
+.project-bookmark-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-chip,
+.tag-pill {
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tag-chip {
+  border: 1px solid rgba(31, 36, 48, 0.08);
+  background: rgba(255, 255, 255, 0.8);
+  color: inherit;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.tag-chip.active,
+.tag-pill {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(15, 118, 110, 0.22);
+}
+
+.tag-pill {
+  padding: 6px 10px;
+}
+
+.bookmark-list,
+.project-main-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.bookmark-card,
+.empty-state,
+.project-card,
+.project-detail-panel,
+.project-bookmark-row,
+.project-image-card {
+  padding: 18px;
+}
+
+.bookmark-card {
+  display: grid;
+  gap: 12px;
+}
+
+.bookmark-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.bookmark-title,
+.project-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.bookmark-title:hover,
+.project-link:hover {
+  text-decoration: underline;
+}
+
+.bookmark-url {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+.bookmark-notes {
+  background: rgba(255, 247, 237, 0.9);
+  border-radius: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(194, 65, 12, 0.12);
+}
+
+.meta-line,
+.project-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.checkbox {
+  margin-top: 5px;
+}
+
+.empty-state {
+  text-align: center;
+}
+
+.project-main-grid {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.project-list {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.project-card {
+  cursor: pointer;
+}
+
+.project-card.active {
+  border-color: rgba(15, 118, 110, 0.28);
+  background: rgba(238, 252, 250, 0.9);
+}
+
+.project-detail-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.project-detail-section {
+  display: grid;
+  gap: 10px;
+}
+
+.project-image-grid {
+  gap: 12px;
+}
+
+.project-image-card {
+  width: min(100%, 260px);
+  display: grid;
+  gap: 10px;
+}
+
+.project-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+
+.project-bookmark-list {
+  display: grid;
+  gap: 12px;
+}
+
+.project-bookmark-row {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .project-main-grid {
+    grid-template-columns: 1fr;
+  }
+}

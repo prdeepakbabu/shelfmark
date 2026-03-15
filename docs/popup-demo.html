@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelfmark Popup Demo</title>
+    <link rel="stylesheet" href="../popup.css">
+    <style>
+      body {
+        min-width: 420px;
+        min-height: 900px;
+      }
+
+      .demo-frame {
+        width: 420px;
+        margin: 0 auto;
+        padding: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-frame">
+      <main class="popup-shell">
+        <section class="hero">
+          <p class="eyebrow">Shelfmark</p>
+          <h1>Save the page with context.</h1>
+          <p class="subtitle">Bookmark videos, papers, PDFs, blogs, and X articles with tags and sortable metadata.</p>
+        </section>
+
+        <section class="panel current-tab-panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">Current page</p>
+              <h2>OpenAI o3 System Card</h2>
+            </div>
+            <button class="ghost-button" type="button">Dashboard</button>
+          </div>
+          <p class="muted" id="currentUrl">https://cdn.openai.com/research-covers/o3/o3-system-card.pdf</p>
+          <label class="field">
+            <span>Why are you saving this?</span>
+            <textarea rows="3">Read this for model behavior notes and export it into the safety review project.</textarea>
+          </label>
+          <div class="project-panel">
+            <p class="section-label">Project</p>
+            <label class="field compact-field">
+              <span>Add bookmark to an existing project</span>
+              <select>
+                <option>Model evaluation</option>
+                <option>Reading queue</option>
+                <option>Agent ideas</option>
+              </select>
+            </label>
+            <label class="field compact-field">
+              <span>Or create a new project</span>
+              <input type="text" value="Safety export draft">
+            </label>
+            <label class="checkbox-row">
+              <input checked type="checkbox">
+              <span>Capture the visible tab as a project image</span>
+            </label>
+          </div>
+          <button class="primary-button" type="button">Bookmark current page</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header compact">
+            <div>
+              <p class="section-label">Manual URL</p>
+              <h2>Add something not currently open</h2>
+            </div>
+          </div>
+          <label class="field">
+            <span>URL</span>
+            <input type="url" value="https://x.com/i/articles/1234567890">
+          </label>
+          <button class="secondary-button" type="button">Bookmark pasted URL</button>
+        </section>
+
+        <p class="status success">Bookmark saved. Added to Model evaluation.</p>
+      </main>
+    </div>
+  </body>
+</html>
