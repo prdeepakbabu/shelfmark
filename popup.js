@@ -5,27 +5,53 @@ async function getActiveTab() {
   return tab;
 }
 
+function isInspectableUrl(url = "") {
+  return /^https?:/i.test(url);
+}
+
+async function requestPageMetadata(tabId) {
+  const response = await chrome.tabs.sendMessage(tabId, { type: "EXTRACT_PAGE_METADATA" });
+  return response?.ok ? response.metadata : null;
+}
+
 async function extractCurrentMetadata(tab) {
   if (!tab?.id) {
     return {};
   }
 
-  try {
-    const response = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_PAGE_METADATA" });
-    if (response?.ok) {
-      return response.metadata;
-    }
-  } catch {
-    return {
-      title: tab.title,
-      url: tab.url
-    };
-  }
-
-  return {
+  const fallbackMetadata = {
     title: tab.title,
     url: tab.url
   };
+
+  try {
+    const metadata = await requestPageMetadata(tab.id);
+    if (metadata) {
+      return metadata;
+    }
+  } catch {
+    // Fall through and try a one-off injection. This covers tabs that were already open
+    // when the extension was reloaded and therefore do not yet have the content script.
+  }
+
+  if (!isInspectableUrl(tab.url)) {
+    return fallbackMetadata;
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content-script.js"]
+    });
+    const metadata = await requestPageMetadata(tab.id);
+    if (metadata) {
+      return metadata;
+    }
+  } catch {
+    // Fall back to the tab title/URL if the page is restricted or the injection fails.
+  }
+
+  return fallbackMetadata;
 }
 
 const currentTitle = document.getElementById("currentTitle");
